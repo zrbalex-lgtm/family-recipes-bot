@@ -1,29 +1,28 @@
 # Family Recipes Bot
 
-Private family Telegram recipe bot: [@Recipes_zrb_bot](https://t.me/Recipes_zrb_bot). Supabase project: `opufwbpkuofxhfmlqhqq`.
+Private Telegram bot: [@Recipes_zrb_bot](https://t.me/Recipes_zrb_bot). Supabase project `opufwbpkuofxhfmlqhqq`.
 
-## Phase 1 status
-Infrastructure and source code prepared. **Not deployed**; no Telegram webhook configured. Telegram token is user-managed in Supabase Secrets, and its presence/value has not been independently verified.
+## Status
+Phase 1 pre-deployment preparation. **Not deployed; no webhook configured.** The user reports adding `FAMILY_RECIPES_TELEGRAM_TOKEN` to Supabase Secrets, but it has not been independently verified.
 
 ## Isolation
-All six application tables are in private `family_recipes` schema. The existing `parent_control` schema and `telegram-bot` Edge Function must never be changed. The new function is `family-recipes-bot`.
+Six tables in private schema `family_recipes`. Never change `parent_control` or the existing `telegram-bot` function.
 
-## Database migrations
-Two migrations have already been applied remotely and are mirrored here with matching versions:
-- `20261107093258_create_family_recipes_private_schema.sql`
-- `20261107213548_family_recipes_recoverable_webhook_updates.sql`
+## Applied migrations
+These exact remote versions are mirrored under `supabase/migrations`:
+- 20261107093258_create_family_recipes_private_schema
+- 20261107213548_family_recipes_recoverable_webhook_updates
+- 20261107213855_family_recipes_dedicated_login_without_password
+- 20261107213858_family_recipes_login_inherit_app_permissions
+- 20261107214000_family_recipes_login_explicit_access
 
-**Do not apply them again to the existing project.** Verify remote/local migration history before any future deployment. Do not run `supabase db reset` on this shared project.
+Do **not** reapply them to this Supabase project. Do not run `supabase db reset` against the shared database.
 
-## Required secrets
-- `FAMILY_RECIPES_TELEGRAM_TOKEN` - user reports it was set in Supabase Secrets
-- `FAMILY_RECIPES_WEBHOOK_SECRET` - not configured
-- `FAMILY_RECIPES_DATABASE_URL` - not configured
-
-Never commit secret values. `family_recipes_app` is a NOLOGIN role, so a restricted login role, connection setup and privilege verification are pending.
+## Database role
+`family_recipes_login` exists and has verified schema usage and SELECT permission for the bot allowlist. It has **no password** and therefore cannot connect yet. Set a secure password outside chat, and store its transaction pooler URL as `FAMILY_RECIPES_DATABASE_URL` Supabase Secret before deployment.
 
 ## Tests
-`deno test tests/` (Deno required). Tests have **not** been executed in the target runtime. No integration tests have been run.
+Five pure-module tests passed using Node.js v22 `node --experimental-strip-types --test tests/telegram_test.ts` in a local copy. Full Deno type checking and live database/Telegram integration tests have not been run. See `docs/deployment-checklist.md`.
 
-## Important delivery caveat
-Webhook processing now uses a lease and retryable status. A failed send is retryable, but a network timeout after Telegram accepted a message can still cause duplicate replies; a lease expiring during a slow request can also permit a second worker to process the same update. Resolve this before production. Only /start and /help are implemented.
+## Delivery semantics
+Only /start and /help are implemented. Confirmed Telegram rejections are retryable; ambiguous send timeouts are not retried automatically to avoid duplicates. Processing crashes require manual review of the `processed_updates` table. No claim of exactly-once delivery.
