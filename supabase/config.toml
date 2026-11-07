@@ -1,0 +1,4 @@
+project_id = "opufwbpkuofxhfmlqhqq"
+
+[functions.family-recipes-bot]
+verify_jwt = false
