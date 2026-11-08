@@ -18,9 +18,8 @@ async function showRecipe(userId:number,id:string):Promise<string> {
   if(!rows.length)return 'Этот рецепт больше не найден. Попробуй новый поиск.';
   const r=rows[0];
   const ingredients=await db`select name,quantity,unit,note from family_recipes.recipe_ingredients where recipe_id=${id} order by sort_order`;
-  await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results)
-    values (${userId},${db.json([{id:r.id,title:r.title,tags:r.tags??[]}])})
-    on conflict (telegram_user_id) do update set last_search_results=excluded.last_search_results,updated_at=now()`;
+  // Keep the search result list intact so users can open another numbered result.
+  // Viewing a recipe must not replace the last search with a single-item list.
   const steps=Array.isArray(r.instructions)?r.instructions.filter((x:unknown)=>typeof x==='string'):[];
   return '🍽 '+r.title+(r.description?'\n'+r.description:'')+'\n\nИнгредиенты:\n'
     +(ingredients as unknown as {name:string;quantity:string|null;unit:string|null;note:string|null}[]).map(i=>'• '+[i.name,i.quantity,i.unit,i.note?'('+i.note+')':null].filter(x=>x!==null&&x!=='').join(' ')).join('\n')
