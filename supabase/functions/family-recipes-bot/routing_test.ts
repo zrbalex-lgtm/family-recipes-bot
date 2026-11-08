@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { classifyLocalCommand, listPage, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from "./routing.ts";
+import { classifyLocalCommand, listPage, localRecipeSearch, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from "./routing.ts";
 
 Deno.test("list all recipes is a list, not contextual show", () => {
   for (const input of ["Покажи все рецепты", "покажи всё рецепты", "Выведи все рецепты", "список рецептов", "/list"]) {
@@ -47,4 +47,11 @@ Deno.test("numbered recipe list pages",()=>{
   assertEquals(listPage("Список рецептов страница 2"),2);
   assertEquals(listPage("/list 3"),3);
   assertEquals(listPage("Покажи все рецепты"),1);
+});
+
+Deno.test("explicit ingredient and tag searches bypass previous results",()=>{
+  assertEquals(localRecipeSearch("Покажи рецепты с сыром"),"сыр");
+  assertEquals(localRecipeSearch("Покажи рецепты на завтрак"),"завтрак");
+  assertEquals(localRecipeSearch("Найди рецепты с сыром"),"сыр");
+  assertEquals(localRecipeSearch("Покажи рецепт Пани"),null);
 });
