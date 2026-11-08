@@ -27,7 +27,7 @@ export async function extractRecipe(text:string,key:string):Promise<Recipe> {
   if(!value||!Array.isArray(value.ingredients)||!Array.isArray(value.instructions)) throw new Error('Invalid recipe JSON');
   const recipe:Recipe={title:str(value.title).slice(0,200),description:nullable(value.description),
     ingredients:value.ingredients.slice(0,80).map((v:Record<string,unknown>)=>({name:str(v.name).slice(0,200),quantity:quantity(v.quantity),unit:nullable(v.unit)?.slice(0,40)??null,note:nullable(v.note)})).filter((v:{name:string})=>v.name),
-    instructions:value.instructions.slice(0,60).map(str).filter(Boolean),tags:Array.isArray(value.tags)?[...new Set(value.tags.map((v:unknown)=>str(v).toLowerCase().slice(0,40)).filter(Boolean))].slice(0,5):[]};
+    instructions:value.instructions.slice(0,60).map(str).filter(Boolean),tags:Array.isArray(value.tags)?[...new Set<string>((value.tags as unknown[]).map((v:unknown)=>str(v).toLowerCase().slice(0,40)).filter(Boolean))].slice(0,5):[]};
   if(!recipe.title||!recipe.ingredients.length||!recipe.instructions.length) throw new Error('Not a complete recipe');
   return recipe;
 }
