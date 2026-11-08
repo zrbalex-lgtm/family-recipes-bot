@@ -1,4 +1,4 @@
-import { classifyLocalCommand, parseDraftCallback } from './routing.ts';
+import { classifyLocalCommand, parseDraftCallback, explicitRecipeTitle } from './routing.ts';
 import { createDatabase } from '../_shared/database.ts';
 import { validWebhookSecret } from '../_shared/auth.ts';
 import { parseUpdate, sendMessage, answerCallback, clearButtons, getTelegramPhoto, sendJsonExport, TelegramRejected } from '../_shared/telegram.ts';
@@ -32,6 +32,17 @@ async function openFromContext(userId:number,text:string):Promise<string|null> {
   const command=text.trim().toLowerCase();
   const isView=/^(?:покажи(?: мне)?(?: рецепт)?|подробнее|открой(?: рецепт)?|посмотреть(?: рецепт)?|рецепт|[1-9]|первый|второй|третий)(?:\s.*)?$/iu.test(command);
   if(/^(?:покажи(?: мне)?|выведи|список)\s+(?:все|всё)\s+рецепты$/iu.test(command))return null;
+  const requestedTitle=explicitRecipeTitle(text);
+  if(requestedTitle){
+    const escaped=requestedTitle.replace(/[\\%_]/g,'');
+    const exact=await db`select id from family_recipes.recipes where deleted_at is null and lower(title)=${requestedTitle.toLowerCase()} order by created_at desc limit 2`;
+    if(exact.length===1)return showRecipe(userId,exact[0].id as string);
+    if(exact.length>1)return 'Найдено несколько рецептов с таким названием. Уточни название.';
+    const matches=await db`select id,title from family_recipes.recipes where deleted_at is null and title ilike ${'%'+escaped+'%'} order by created_at desc limit 2`;
+    if(matches.length===1)return showRecipe(userId,matches[0].id as string);
+    if(matches.length>1)return 'Найдено несколько похожих рецептов. Уточни название.';
+    return 'Рецепт «'+requestedTitle+'» не найден. Попробуй поиск по другому названию.';
+  }
   if(!isView)return null;
   const sessions=await db`select last_search_results from family_recipes.bot_sessions where telegram_user_id=${userId} limit 1`;
   const hits:SearchHit[]=Array.isArray(sessions[0]?.last_search_results)?sessions[0].last_search_results.filter((v:unknown)=>v&&typeof v==='object'&&typeof (v as SearchHit).id==='string'):[];
