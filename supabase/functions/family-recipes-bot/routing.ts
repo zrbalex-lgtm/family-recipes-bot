@@ -45,3 +45,13 @@ export function listPage(text:string):number{
   const match=/(?:страница\s+|^\/list\s+)([1-9]\d{0,3})$/iu.exec(text.trim());
   return match?Number(match[1]):1;
 }
+
+export function localRecipeSearch(text:string):string|null{
+  const command=text.trim().toLocaleLowerCase('ru');
+  const match=/^(?:покажи(?: мне)?|найди|подбери)\s+рецепты?\s+(?:с|со|на|по)\s+(.+)$/iu.exec(command);
+  if(!match)return null;
+  const raw=match[1].trim();
+  if(raw==='сыром'||raw==='сыра')return 'сыр';
+  if(raw==='завтрак'||raw==='завтраки')return 'завтрак';
+  return raw;
+}
