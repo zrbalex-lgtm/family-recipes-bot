@@ -35,3 +35,8 @@ Deno.test("typo suggestions are explicit and conservative",()=>{
   assertEquals(suggestRecipeTitles('пани валевская',titles),[]);
   assertEquals(suggestRecipeTitles('абсолютно другое блюдо',titles),[]);
 });
+
+Deno.test("recipe list command word-order variants",()=>{
+  for(const input of ['Покажи рецепты все','Покажи все рецепты','Список рецептов','Какие рецепты есть','Какие рецепты у нас есть','Перечень рецептов'])assertEquals(classifyLocalCommand(input),'list');
+  for(const input of ['Покажи рецепт Пани','Покажи рецепты с сыром'])assertEquals(classifyLocalCommand(input),'other');
+});
