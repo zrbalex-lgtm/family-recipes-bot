@@ -1,4 +1,4 @@
-import { classifyLocalCommand } from './routing.ts';
+import { classifyLocalCommand, parseDraftCallback } from './routing.ts';
 import { createDatabase } from '../_shared/database.ts';
 import { validWebhookSecret } from '../_shared/auth.ts';
 import { parseUpdate, sendMessage, answerCallback, clearButtons, getTelegramPhoto, sendJsonExport, TelegramRejected } from '../_shared/telegram.ts';
@@ -227,9 +227,9 @@ Deno.serve(async request=>{
   }catch{return new Response('Invalid JSON',{status:400});}
   if(!update)return new Response('Invalid update',{status:400});
   const cb=update.callback_query;
-  const match=cb?.data?.match(/^draft:(save|confirm|delete|cancel):([0-9a-f-]{36})$/);
+  const match=parseDraftCallback(cb?.data);
   const callbackValid=!!(cb&&match&&cb.message?.chat.type==='private'&&cb.from.id===cb.message.chat.id);
-  const m=callbackValid?{chat:cb!.message!.chat,from:cb!.from,text:match![1]==='save'?'сохранить':match![1]==='confirm'?'подтвердить':match![1]==='delete'?'удалить':'отмена'}:update.message;
+  const m=callbackValid?{chat:cb!.message!.chat,from:cb!.from,text:match!.action==='save'?'сохранить':match!.action==='confirm'?'подтвердить':match!.action==='delete'?'удалить':'отмена'}:update.message;
   if(!m||m.chat.type!=='private'||!m.from||m.chat.id!==m.from.id||(typeof m.text!=='string'&&!Array.isArray(m.photo)))return ok();
   try{
     const users=await db`select 1 from family_recipes.bot_users where telegram_user_id=${m.from.id} and is_active=true limit 1`;
@@ -240,7 +240,7 @@ Deno.serve(async request=>{
       where family_recipes.processed_updates.status='retryable' returning update_id`;
     if(!claimed.length)return ok();
     let reply:string;
-    try{reply=Array.isArray(m.photo)&&m.photo.length?await handlePhoto(m.from.id,m.photo[m.photo.length-1].file_id,m.caption??''):await handle(m.from.id,m.text??'',callbackValid?match![2]:undefined);}
+    try{reply=Array.isArray(m.photo)&&m.photo.length?await handlePhoto(m.from.id,m.photo[m.photo.length-1].file_id,m.caption??''):await handle(m.from.id,m.text??'',callbackValid?match!.draftId:undefined);}
     catch(error){
       const message=error instanceof Error?error.message:'';
       const geminiStatus=/^Gemini HTTP (\\d{3})$/.exec(message);
