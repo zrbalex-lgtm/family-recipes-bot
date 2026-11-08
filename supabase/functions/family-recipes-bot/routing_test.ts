@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { classifyLocalCommand, parseDraftCallback, explicitRecipeTitle } from "./routing.ts";
+import { classifyLocalCommand, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from "./routing.ts";
 
 Deno.test("list all recipes is a list, not contextual show", () => {
   for (const input of ["Покажи все рецепты", "покажи всё рецепты", "Выведи все рецепты", "список рецептов", "/list"]) {
@@ -27,4 +27,11 @@ Deno.test("explicit recipe name wins over last opened recipe",()=>{
   assertEquals(explicitRecipeTitle('покажи рецепт пани валевская'),'пани валевская');
   assertEquals(explicitRecipeTitle('Покажи рецепт'),null);
   assertEquals(explicitRecipeTitle('Покажи все рецепты'),null);
+});
+
+Deno.test("typo suggestions are explicit and conservative",()=>{
+  const titles=['Пани Валевская','Сырники','Борщ'];
+  assertEquals(suggestRecipeTitles('пани валемская',titles),['Пани Валевская']);
+  assertEquals(suggestRecipeTitles('пани валевская',titles),[]);
+  assertEquals(suggestRecipeTitles('абсолютно другое блюдо',titles),[]);
 });
