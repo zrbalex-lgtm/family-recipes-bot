@@ -37,7 +37,7 @@ async function showRecipe(userId:number,id:string):Promise<string> {
     on conflict (telegram_user_id) do update set last_search_results=excluded.last_search_results,updated_at=now()`;
   const steps=Array.isArray(r.instructions)?r.instructions.filter((x:unknown)=>typeof x==='string'):[];
   return '🍽 '+r.title+(r.description?'\n'+r.description:'')+'\n\nИнгредиенты:\n'
-    +ingredients.map((i:{name:string;quantity:string|null;unit:string|null;note:string|null})=>'• '+[i.name,i.quantity,i.unit,i.note?'('+i.note+')':null].filter(x=>x!==null&&x!=='').join(' ')).join('\n')
+    +(ingredients as unknown as {name:string;quantity:string|null;unit:string|null;note:string|null}[]).map(i=>'• '+[i.name,i.quantity,i.unit,i.note?'('+i.note+')':null].filter(x=>x!==null&&x!=='').join(' ')).join('\n')
     +'\n\nПриготовление:\n'+steps.map((s:string,n:number)=>(n+1)+'. '+s).join('\n')
     +(r.tags?.length?'\n\nТеги: '+r.tags.join(', '):'');
 }
@@ -111,7 +111,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   if(classifyLocalCommand(command)==='list'){
     const rows=await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by title limit 11`;
     if(!rows.length)return 'В семейной книге пока нет рецептов.';
-    const hits:SearchHit[]=rows.slice(0,10).map((r:{id:string;title:string;tags:string[]})=>({id:r.id,title:r.title,tags:r.tags??[]}));
+    const hits:SearchHit[]=(rows.slice(0,10) as unknown as SearchHit[]).map(r=>({id:r.id,title:r.title,tags:r.tags??[]}));
     await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results)
       values (${userId},${db.json(hits)})
       on conflict (telegram_user_id) do update set last_search_results=excluded.last_search_results,updated_at=now()`;
@@ -185,7 +185,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
       ?await db`select id,title,tags from family_recipes.recipes where deleted_at is null and (title ilike ${'%'+query+'%'} or exists (select 1 from unnest(tags) t where t ilike ${'%'+query+'%'})) order by created_at desc limit 10`
       :await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by created_at desc limit 10`;
     if(!rows.length)return 'Пока не нашёл подходящих рецептов. Попробуй другое название или попроси показать все рецепты.';
-    const hits:SearchHit[]=rows.map((r:{id:string;title:string;tags:string[]})=>({id:r.id,title:r.title,tags:r.tags??[]}));
+    const hits:SearchHit[]=(rows as unknown as SearchHit[]).map(r=>({id:r.id,title:r.title,tags:r.tags??[]}));
     await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results)
       values (${userId},${db.json(hits)})
       on conflict (telegram_user_id) do update set last_search_results=excluded.last_search_results,updated_at=now()`;
