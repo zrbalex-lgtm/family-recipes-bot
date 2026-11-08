@@ -15,3 +15,28 @@ export function explicitRecipeTitle(text:string):string|null{
   const title=match?.[1]?.trim();
   return title&&title.length<=200?title:null;
 }
+
+export function suggestRecipeTitles(query:string,titles:string[],maxResults=3):string[]{
+  const normalize=(value:string)=>value.toLocaleLowerCase('ru').normalize('NFC').replace(/ё/g,'е').replace(/[^\\p{L}\\p{N}]+/gu,' ').trim();
+  const distance=(a:string,b:string):number=>{
+    const previous=Array.from({length:b.length+1},(_,i)=>i);
+    for(let i=1;i<=a.length;i++){
+      let diagonal=previous[0];
+      previous[0]=i;
+      for(let j=1;j<=b.length;j++){
+        const old=previous[j];
+        previous[j]=Math.min(previous[j]+1,previous[j-1]+1,diagonal+(a[i-1]===b[j-1]?0:1));
+        diagonal=old;
+      }
+    }
+    return previous[b.length];
+  };
+  const q=normalize(query);
+  if(q.length<4)return [];
+  return titles.map(title=>{
+    const t=normalize(title);
+    return {title,score:distance(q,t),length:Math.max(q.length,t.length)};
+  }).filter(x=>x.score>0&&x.score<=Math.max(1,Math.floor(x.length*0.3)))
+    .sort((a,b)=>a.score-b.score||a.title.localeCompare(b.title,'ru'))
+    .slice(0,Math.max(0,maxResults)).map(x=>x.title);
+}
