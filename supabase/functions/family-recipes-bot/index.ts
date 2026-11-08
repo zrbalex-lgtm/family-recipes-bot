@@ -1,3 +1,4 @@
+import { classifyLocalCommand } from './routing.ts';
 import { createDatabase } from '../_shared/database.ts';
 import { validWebhookSecret } from '../_shared/auth.ts';
 import { parseUpdate, sendMessage, answerCallback, clearButtons, getTelegramPhoto, sendJsonExport, TelegramRejected } from '../_shared/telegram.ts';
@@ -107,7 +108,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   if(!db) throw new Error('Database missing');
   const command=text.trim().toLowerCase();
   if(command==='/export'||command==='экспорт рецептов')return 'Готовлю JSON-файл с семейными рецептами.';
-  if(/^(?:покажи(?: мне)?|выведи)\s+(?:все|всё)\s+рецепты$/iu.test(command)||command==='список рецептов'||command==='/list'){
+  if(classifyLocalCommand(command)==='list'){
     const rows=await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by title limit 11`;
     if(!rows.length)return 'В семейной книге пока нет рецептов.';
     const hits:SearchHit[]=rows.slice(0,10).map((r:{id:string;title:string;tags:string[]})=>({id:r.id,title:r.title,tags:r.tags??[]}));
