@@ -248,7 +248,10 @@ Deno.serve(async request=>{
       values (${update.update_id},'processing',now()+interval '30 seconds')
       on conflict (update_id) do update set status='processing',attempts=family_recipes.processed_updates.attempts+1,lease_until=now()+interval '30 seconds'
       where family_recipes.processed_updates.status='retryable' returning update_id`;
-    if(!claimed.length)return ok();
+    if(!claimed.length){
+      if(callbackValid)await answerCallback(token,cb!.id).catch(()=>console.error('Callback acknowledgement failed'));
+      return ok();
+    }
     let reply:string;
     try{reply=Array.isArray(m.photo)&&m.photo.length?await handlePhoto(m.from.id,m.photo[m.photo.length-1].file_id,m.caption??''):await handle(m.from.id,m.text??'',callbackValid?match!.draftId:undefined);}
     catch(error){
