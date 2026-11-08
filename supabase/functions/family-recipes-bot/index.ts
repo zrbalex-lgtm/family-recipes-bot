@@ -30,7 +30,7 @@ async function openFromContext(userId:number,text:string):Promise<string|null> {
   if(!db)throw new Error('Database missing');
   const command=text.trim().toLowerCase();
   const isView=/^(?:покажи(?: мне)?(?: рецепт)?|подробнее|открой(?: рецепт)?|посмотреть(?: рецепт)?|рецепт|[1-9]|первый|второй|третий)(?:\s.*)?$/iu.test(command);
-  if(/^(?:покажи(?: мне)?|выведи|список)\s+(?:все|всё)\s+рецепты$/iu.test(command))return null;
+  if(classifyLocalCommand(command)==='list')return null;
   const requestedTitle=explicitRecipeTitle(text);
   if(requestedTitle){
     const escaped=requestedTitle.replace(/[\\%_]/g,'');
@@ -191,7 +191,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
       if(fromContext!==null)return fromContext;
     }
     const rows=query
-      ?await db`select id,title,tags from family_recipes.recipes where deleted_at is null and (title ilike ${'%'+query+'%'} or exists (select 1 from unnest(tags) t where t ilike ${'%'+query+'%'})) order by created_at desc limit 10`
+      ?await db`select id,title,tags from family_recipes.recipes where deleted_at is null and (title ilike ${'%'+query+'%'} or exists (select 1 from unnest(tags) t where t ilike ${'%'+query+'%'}) or exists (select 1 from family_recipes.recipe_ingredients ri where ri.recipe_id=recipes.id and ri.name ilike ${'%'+query+'%'})) order by created_at desc limit 10`
       :await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by created_at desc limit 10`;
     if(!rows.length)return 'Пока не нашёл подходящих рецептов. Попробуй другое название или попроси показать все рецепты.';
     const hits:SearchHit[]=(rows as unknown as SearchHit[]).map(r=>({id:r.id,title:r.title,tags:r.tags??[]}));
