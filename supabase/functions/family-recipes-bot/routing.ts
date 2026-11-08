@@ -1,6 +1,6 @@
 export function classifyLocalCommand(text:string):'list'|'other'{
   const command=text.trim().toLowerCase();
-  return /^(?:(?:покажи(?: мне)?|выведи)\s+(?:(?:все|всё)\s+рецепты|рецепты\s+(?:все|всё))|(?:список|перечень)\s+рецептов|какие\s+рецепты\s+(?:есть|у нас есть))$/iu.test(command)||command==='/list'?'list':'other';
+  return /^(?:(?:покажи(?: мне)?|выведи)\s+(?:(?:все|всё)\s+рецепты|рецепты\s+(?:все|всё))|(?:список|перечень)\s+рецептов|какие\s+рецепты\s+(?:есть|у нас есть))(?:\s+страница\s+[1-9]\d{0,3})?$/iu.test(command)||/^\/list(?:\s+[1-9]\d{0,3})?$/iu.test(command)?'list':'other';
 }
 
 export type DraftAction='save'|'confirm'|'delete'|'cancel';
@@ -39,4 +39,9 @@ export function suggestRecipeTitles(query:string,titles:string[],maxResults=3):s
   }).filter(x=>x.score>0&&x.score<=Math.max(1,Math.floor(x.length*0.3)))
     .sort((a,b)=>a.score-b.score||a.title.localeCompare(b.title,'ru'))
     .slice(0,Math.max(0,maxResults)).map(x=>x.title);
+}
+
+export function listPage(text:string):number{
+  const match=/(?:страница\s+|^\/list\s+)([1-9]\d{0,3})$/iu.exec(text.trim());
+  return match?Number(match[1]):1;
 }
