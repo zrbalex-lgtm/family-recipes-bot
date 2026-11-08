@@ -44,6 +44,7 @@ async function openFromContext(userId:number,text:string):Promise<string|null> {
   if(!db)throw new Error('Database missing');
   const command=text.trim().toLowerCase();
   const isView=/^(?:покажи(?: мне)?(?: рецепт)?|подробнее|открой(?: рецепт)?|посмотреть(?: рецепт)?|рецепт|[1-9]|первый|второй|третий)(?:\s.*)?$/iu.test(command);
+  if(/^(?:покажи(?: мне)?|выведи|список)\s+(?:все|всё)\s+рецепты$/iu.test(command))return null;
   if(!isView)return null;
   const sessions=await db`select last_search_results from family_recipes.bot_sessions where telegram_user_id=${userId} limit 1`;
   const hits:SearchHit[]=Array.isArray(sessions[0]?.last_search_results)?sessions[0].last_search_results.filter((v:unknown)=>v&&typeof v==='object'&&typeof (v as SearchHit).id==='string'):[];
@@ -94,6 +95,7 @@ async function handlePhoto(userId:number,fileId:string,caption:string):Promise<s
 async function exportRecipes():Promise<string>{
   if(!db)throw new Error('Database missing');
   const rows=await db`select id,title,description,instructions,tags,created_at,updated_at from family_recipes.recipes where deleted_at is null order by title limit 2000`;
+  if(rows.length===2000)throw new Error('Export limit reached: 2000 recipes');
   const ids=rows.map(r=>r.id);
   const ingredients=ids.length?await db`select recipe_id,name,quantity,unit,note,sort_order from family_recipes.recipe_ingredients where recipe_id in ${db(ids)} order by recipe_id,sort_order`:[];
   const byId=new Map<string,unknown[]>();
@@ -105,6 +107,16 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   if(!db) throw new Error('Database missing');
   const command=text.trim().toLowerCase();
   if(command==='/export'||command==='экспорт рецептов')return 'Готовлю JSON-файл с семейными рецептами.';
+  if(/^(?:покажи(?: мне)?|выведи)\\s+(?:все|всё)\\s+рецепты$/iu.test(command)||command==='список рецептов'||command==='/list'){
+    const rows=await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by title limit 11`;
+    if(!rows.length)return 'В семейной книге пока нет рецептов.';
+    const hits:SearchHit[]=rows.slice(0,10).map((r:{id:string;title:string;tags:string[]})=>({id:r.id,title:r.title,tags:r.tags??[]}));
+    await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results)
+      values (${userId},${db.json(hits)})
+      on conflict (telegram_user_id) do update set last_search_results=excluded.last_search_results,updated_at=now()`;
+    return 'Рецепты в семейной книге:\\n'+hits.map((r,i)=>(i+1)+'. '+r.title).join('\\n')+(rows.length>10?'\\nПоказаны первые 10 рецептов.':'')+'\\n\\nНапиши номер, чтобы открыть рецепт.';
+  }
+
   if(command==='/start') return 'Добро пожаловать в семейную книгу рецептов! Пришли рецепт текстом, я оформлю его и предложу сохранить. /help - справка.';
   if(command==='/help') return 'Опиши блюдо, даже кратко: «Бутерброд: хлеб, сыр, ветчина». Или попроси: «Найди сырники», «Покажи все рецепты». Для сохранения черновика ответь «сохранить». Пока поддерживаются текстовые рецепты.';
   if(command==='отмена'||command==='/cancel') {
