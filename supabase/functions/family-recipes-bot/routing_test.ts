@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { classifyLocalCommand, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from "./routing.ts";
+import { classifyLocalCommand, listPage, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from "./routing.ts";
 
 Deno.test("list all recipes is a list, not contextual show", () => {
   for (const input of ["Покажи все рецепты", "покажи всё рецепты", "Выведи все рецепты", "список рецептов", "/list"]) {
@@ -39,4 +39,12 @@ Deno.test("typo suggestions are explicit and conservative",()=>{
 Deno.test("recipe list command word-order variants",()=>{
   for(const input of ['Покажи рецепты все','Покажи все рецепты','Список рецептов','Какие рецепты есть','Какие рецепты у нас есть','Перечень рецептов'])assertEquals(classifyLocalCommand(input),'list');
   for(const input of ['Покажи рецепт Пани','Покажи рецепты с сыром'])assertEquals(classifyLocalCommand(input),'other');
+});
+
+Deno.test("numbered recipe list pages",()=>{
+  assertEquals(classifyLocalCommand("Список рецептов страница 2"),"list");
+  assertEquals(classifyLocalCommand("/list 3"),"list");
+  assertEquals(listPage("Список рецептов страница 2"),2);
+  assertEquals(listPage("/list 3"),3);
+  assertEquals(listPage("Покажи все рецепты"),1);
 });
