@@ -26,3 +26,9 @@ Source: deployed Supabase Edge Function family-recipes-bot v22, snapshotted in t
 - Only then merge and deploy with rollback instructions.
 
 Do not touch parent_control or unrelated Edge Functions.
+
+## Audit progress
+- GitHub Actions Deno unit tests and type checking passed on commit 78ee331459e9815259d6eb60e690593fad09f7c5 (run 42479877667). Further commits require fresh CI.
+- Reviewed pg_policies: six tables have permissive ALL policies for backend roles family_recipes_app and family_recipes_login. Those policies are acceptable only because the Edge Function authenticates/authorizes the Telegram user and credentials are secret. They do not enforce per-user authorization inside the DB. Review the role membership and secret exposure before wider access.
+- Removed webhook reconfiguration from request handling in the audit branch; setup is now documented in docs/telegram-webhook.md.
+- No production deploy or database mutation performed during this audit.
