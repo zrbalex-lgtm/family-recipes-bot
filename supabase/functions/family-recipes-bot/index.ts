@@ -1,4 +1,4 @@
-import { classifyLocalCommand, parseDraftCallback, explicitRecipeTitle } from './routing.ts';
+import { classifyLocalCommand, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from './routing.ts';
 import { createDatabase } from '../_shared/database.ts';
 import { validWebhookSecret } from '../_shared/auth.ts';
 import { parseUpdate, sendMessage, answerCallback, clearButtons, getTelegramPhoto, sendJsonExport, TelegramRejected } from '../_shared/telegram.ts';
@@ -40,6 +40,9 @@ async function openFromContext(userId:number,text:string):Promise<string|null> {
     const matches=await db`select id,title from family_recipes.recipes where deleted_at is null and title ilike ${'%'+escaped+'%'} order by created_at desc limit 2`;
     if(matches.length===1)return showRecipe(userId,matches[0].id as string);
     if(matches.length>1)return 'Найдено несколько похожих рецептов. Уточни название.';
+    const candidates=await db`select title from family_recipes.recipes where deleted_at is null order by title limit 500`;
+    const suggestions=suggestRecipeTitles(requestedTitle,candidates.map(r=>String(r.title)));
+    if(suggestions.length)return 'Рецепт «'+requestedTitle+'» не найден. Возможно, ты имел в виду: '+suggestions.map(t=>'«'+t+'»').join(', ')+'. Напиши точное название для открытия.';
     return 'Рецепт «'+requestedTitle+'» не найден. Попробуй поиск по другому названию.';
   }
   if(!isView)return null;
