@@ -1,6 +1,6 @@
 export function classifyLocalCommand(text:string):'list'|'other'{
   const command=text.trim().toLowerCase();
-  return /^(?:покажи(?: мне)?|выведи)\s+(?:все|всё)\s+рецепты$/iu.test(command)||command==='список рецептов'||command==='/list'?'list':'other';
+  return /^(?:(?:покажи(?: мне)?|выведи)\s+(?:(?:все|всё)\s+рецепты|рецепты\s+(?:все|всё))|(?:список|перечень)\s+рецептов|какие\s+рецепты\s+(?:есть|у нас есть))$/iu.test(command)||command==='/list'?'list':'other';
 }
 
 export type DraftAction='save'|'confirm'|'delete'|'cancel';
