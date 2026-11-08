@@ -114,7 +114,17 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
     await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results)
       values (${userId},${db.json(hits)})
       on conflict (telegram_user_id) do update set last_search_results=excluded.last_search_results,updated_at=now()`;
-    return 'Рецепты в семейной книге:\n'+hits.map((r,i)=>(i+1)+'. '+r.title).join('\n')+(rows.length>10?'\nПоказаны первые 10 рецептов.':'')+'\n\nНапиши номер, чтобы открыть рецепт.';
+    const titleCounts=new Map<string,number>();
+    for(const hit of hits){const key=hit.title.toLocaleLowerCase('ru');titleCounts.set(key,(titleCounts.get(key)??0)+1);}
+    const duplicateIds=hits.filter(h=>(titleCounts.get(h.title.toLocaleLowerCase('ru'))??0)>1).map(h=>h.id);
+    const details=duplicateIds.length?await db`select recipe_id,name from family_recipes.recipe_ingredients where recipe_id in ${db(duplicateIds)} order by sort_order`:[];
+    const ingredientNames=new Map<string,string[]>();
+    for(const item of details){const id=String(item.recipe_id);const names=ingredientNames.get(id)??[];if(names.length<3)names.push(String(item.name));ingredientNames.set(id,names);}
+    return 'Рецепты в семейной книге:\\n'+hits.map((r,i)=>{
+      const duplicate=(titleCounts.get(r.title.toLocaleLowerCase('ru'))??0)>1;
+      const preview=duplicate?(ingredientNames.get(r.id)??[]).join(', '):'';
+      return (i+1)+'. '+r.title+(duplicate&&preview?' ('+preview+')':'');
+    }).join('\\n')+(rows.length>10?'\\nПоказаны первые 10 рецептов.':'')+'\\n\\nНапиши номер, чтобы открыть рецепт.';
   }
 
   if(command==='/start') return 'Добро пожаловать в семейную книгу рецептов! Пришли рецепт текстом, я оформлю его и предложу сохранить. /help - справка.';
