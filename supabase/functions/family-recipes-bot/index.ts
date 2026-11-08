@@ -107,14 +107,14 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   if(!db) throw new Error('Database missing');
   const command=text.trim().toLowerCase();
   if(command==='/export'||command==='экспорт рецептов')return 'Готовлю JSON-файл с семейными рецептами.';
-  if(/^(?:покажи(?: мне)?|выведи)\\s+(?:все|всё)\\s+рецепты$/iu.test(command)||command==='список рецептов'||command==='/list'){
+  if(/^(?:покажи(?: мне)?|выведи)\s+(?:все|всё)\s+рецепты$/iu.test(command)||command==='список рецептов'||command==='/list'){
     const rows=await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by title limit 11`;
     if(!rows.length)return 'В семейной книге пока нет рецептов.';
     const hits:SearchHit[]=rows.slice(0,10).map((r:{id:string;title:string;tags:string[]})=>({id:r.id,title:r.title,tags:r.tags??[]}));
     await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results)
       values (${userId},${db.json(hits)})
       on conflict (telegram_user_id) do update set last_search_results=excluded.last_search_results,updated_at=now()`;
-    return 'Рецепты в семейной книге:\\n'+hits.map((r,i)=>(i+1)+'. '+r.title).join('\\n')+(rows.length>10?'\\nПоказаны первые 10 рецептов.':'')+'\\n\\nНапиши номер, чтобы открыть рецепт.';
+    return 'Рецепты в семейной книге:\n'+hits.map((r,i)=>(i+1)+'. '+r.title).join('\n')+(rows.length>10?'\nПоказаны первые 10 рецептов.':'')+'\n\nНапиши номер, чтобы открыть рецепт.';
   }
 
   if(command==='/start') return 'Добро пожаловать в семейную книгу рецептов! Пришли рецепт текстом, я оформлю его и предложу сохранить. /help - справка.';
