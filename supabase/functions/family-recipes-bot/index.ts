@@ -1,4 +1,4 @@
-import { classifyLocalCommand, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from './routing.ts';
+import { classifyLocalCommand, listPage, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from './routing.ts';
 import { createDatabase } from '../_shared/database.ts';
 import { validWebhookSecret } from '../_shared/auth.ts';
 import { parseUpdate, sendMessage, answerCallback, clearButtons, getTelegramPhoto, sendJsonExport, TelegramRejected } from '../_shared/telegram.ts';
@@ -108,8 +108,10 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   const command=text.trim().toLowerCase();
   if(command==='/export'||command==='экспорт рецептов')return 'Готовлю JSON-файл с семейными рецептами.';
   if(classifyLocalCommand(command)==='list'){
-    const rows=await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by title limit 11`;
-    if(!rows.length)return 'В семейной книге пока нет рецептов.';
+    const page=listPage(command);
+    const offset=(page-1)*10;
+    const rows=await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by title,id limit 11 offset ${offset}`;
+    if(!rows.length)return page===1?'В семейной книге пока нет рецептов.':'На странице '+page+' рецептов нет. Напиши «Список рецептов». ';
     const hits:SearchHit[]=(rows.slice(0,10) as unknown as SearchHit[]).map(r=>({id:r.id,title:r.title,tags:r.tags??[]}));
     await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results)
       values (${userId},${db.json(hits)})
@@ -120,11 +122,11 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
     const details=duplicateIds.length?await db`select recipe_id,name from family_recipes.recipe_ingredients where recipe_id in ${db(duplicateIds)} order by sort_order`:[];
     const ingredientNames=new Map<string,string[]>();
     for(const item of details){const id=String(item.recipe_id);const names=ingredientNames.get(id)??[];if(names.length<3)names.push(String(item.name));ingredientNames.set(id,names);}
-    return 'Рецепты в семейной книге:\n'+hits.map((r,i)=>{
+    return 'Рецепты в семейной книге (страница '+page+'):\n'+hits.map((r,i)=>{
       const duplicate=(titleCounts.get(r.title.toLocaleLowerCase('ru'))??0)>1;
       const preview=duplicate?(ingredientNames.get(r.id)??[]).join(', '):'';
       return (i+1)+'. '+r.title+(duplicate&&preview?' ('+preview+')':'');
-    }).join('\n')+(rows.length>10?'\nПоказаны первые 10 рецептов.':'')+'\n\nНапиши номер, чтобы открыть рецепт.';
+    }).join('\n')+(rows.length>10?'\nСледующая страница: «Список рецептов страница '+(page+1)+'».':'')+(page>1?'\nПервая страница: «Список рецептов».':'')+'\n\nНапиши номер от 1 до 10, чтобы открыть рецепт на этой странице.';
   }
 
   if(command==='/start') return 'Добро пожаловать в семейную книгу рецептов! Пришли рецепт текстом, я оформлю его и предложу сохранить. /help - справка.';
