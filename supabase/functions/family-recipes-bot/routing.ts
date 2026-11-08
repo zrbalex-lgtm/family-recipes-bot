@@ -17,7 +17,7 @@ export function explicitRecipeTitle(text:string):string|null{
 }
 
 export function suggestRecipeTitles(query:string,titles:string[],maxResults=3):string[]{
-  const normalize=(value:string)=>value.toLocaleLowerCase('ru').normalize('NFC').replace(/ё/g,'е').replace(/[^\\p{L}\\p{N}]+/gu,' ').trim();
+  const normalize=(value:string)=>value.toLocaleLowerCase('ru').normalize('NFC').replace(/ё/g,'е').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
   const distance=(a:string,b:string):number=>{
     const previous=Array.from({length:b.length+1},(_,i)=>i);
     for(let i=1;i<=a.length;i++){
