@@ -16,6 +16,6 @@ jobs:
         with:
           deno-version: v2.x
       - name: Unit tests
-        run: deno test --allow-none supabase/functions/family-recipes-bot/routing_test.ts
+        run: deno test supabase/functions/family-recipes-bot/routing_test.ts
       - name: Type check entrypoint
         run: deno check supabase/functions/family-recipes-bot/index.ts
