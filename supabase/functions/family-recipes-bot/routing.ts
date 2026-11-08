@@ -9,3 +9,9 @@ export function parseDraftCallback(data:unknown):{action:DraftAction;draftId:str
   const match=/^draft:(save|confirm|delete|cancel):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(data);
   return match?{action:match[1] as DraftAction,draftId:match[2].toLowerCase()}:null;
 }
+
+export function explicitRecipeTitle(text:string):string|null{
+  const match=/^(?:покажи(?: мне)?|открой|посмотреть)\s+рецепт\s+(.+)$/iu.exec(text.trim());
+  const title=match?.[1]?.trim();
+  return title&&title.length<=200?title:null;
+}
