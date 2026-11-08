@@ -11,20 +11,6 @@ const geminiKey=Deno.env.get('FAMILY_RECIPES_GEMINI_API_KEY')??'';
 const db=databaseUrl?createDatabase(databaseUrl):null;
 const ok=()=>new Response('OK',{status:200});
 
-let webhookCheck:Promise<void>|null=null;
-async function ensureCallbackUpdates():Promise<void>{
-  if(!token||!secret)return;
-  const infoResponse=await fetch('https://api.telegram.org/bot'+token+'/getWebhookInfo',{signal:AbortSignal.timeout(7000)});
-  if(!infoResponse.ok){console.error('Webhook check failed',{status:infoResponse.status});return;}
-  const info=await infoResponse.json();
-  if(!info?.ok||typeof info.result?.url!=='string'||!info.result.url.endsWith('/functions/v1/family-recipes-bot')){console.error('Webhook check failed',{reason:'unexpected_webhook'});return;}
-  const allowed=Array.isArray(info.result.allowed_updates)?info.result.allowed_updates.filter((x:unknown)=>typeof x==='string'):[];
-  if(allowed.length===0||allowed.includes('callback_query')){console.log('Callback updates already enabled');return;}
-  const response=await fetch('https://api.telegram.org/bot'+token+'/setWebhook',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:info.result.url,secret_token:secret,allowed_updates:[...new Set([...allowed,'callback_query'])],drop_pending_updates:false,...(typeof info.result.max_connections==='number'?{max_connections:info.result.max_connections}:{})}),signal:AbortSignal.timeout(7000)});
-  console.log('Callback webhook configuration',{success:response.ok,status:response.status});
-}
-
-
 type SearchHit={id:string;title:string;tags:string[]};
 async function showRecipe(userId:number,id:string):Promise<string> {
   if(!db)throw new Error('Database missing');
@@ -230,8 +216,6 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
 
 Deno.serve(async request=>{
   if(request.method!=='POST')return new Response('Method Not Allowed',{status:405});
-  if(!webhookCheck)webhookCheck=ensureCallbackUpdates().catch(()=>console.error('Webhook configuration check failed'));
-  await webhookCheck;
   if(!validWebhookSecret(request.headers.get('X-Telegram-Bot-Api-Secret-Token'),secret))return new Response('Unauthorized',{status:401});
   if(!token||!db)return new Response('Service unavailable',{status:503});
   if(Number(request.headers.get('content-length')??0)>65536)return new Response('Too large',{status:413});
