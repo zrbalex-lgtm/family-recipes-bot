@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { classifyLocalCommand } from "./routing.ts";
+import { classifyLocalCommand, parseDraftCallback } from "./routing.ts";
 
 Deno.test("list all recipes is a list, not contextual show", () => {
   for (const input of ["Покажи все рецепты", "покажи всё рецепты", "Выведи все рецепты", "список рецептов", "/list"]) {
@@ -10,5 +10,14 @@ Deno.test("list all recipes is a list, not contextual show", () => {
 Deno.test("single recipe display is not list", () => {
   for (const input of ["Покажи рецепт", "Покажи 2", "Подробнее", "Найди сырники"]) {
     assertEquals(classifyLocalCommand(input), "other");
+  }
+});
+
+Deno.test("callback parser accepts only bound draft actions",()=>{
+  const id='123e4567-e89b-12d3-a456-426614174000';
+  assertEquals(parseDraftCallback('draft:cancel:'+id),{action:'cancel',draftId:id});
+  assertEquals(parseDraftCallback('draft:save:'+id),{action:'save',draftId:id});
+  for(const bad of ['draft:save:1','draft:delete:../etc/passwd','draft:edit:'+id,'draft:save:'+id+':extra',null,{}]){
+    assertEquals(parseDraftCallback(bad),null);
   }
 });
