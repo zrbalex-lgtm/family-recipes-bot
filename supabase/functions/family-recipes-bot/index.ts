@@ -1,4 +1,4 @@
-import { classifyLocalCommand, listPage, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from './routing.ts';
+import { classifyLocalCommand, listPage, localRecipeSearch, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from './routing.ts';
 import { createDatabase } from '../_shared/database.ts';
 import { validWebhookSecret } from '../_shared/auth.ts';
 import { parseUpdate, sendMessage, answerCallback, clearButtons, getTelegramPhoto, sendJsonExport, TelegramRejected } from '../_shared/telegram.ts';
@@ -180,6 +180,17 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
     return result?(d.draft_type==='delete'?'🗑 Рецепт удалён.':'✅ Изменения рецепта сохранены.'):'Изменение уже обработано.';
   }
   if(text.length>8000) return 'Рецепт слишком длинный. Отправь текст до 8000 символов.';
+  const localQuery=localRecipeSearch(text);
+  if(localQuery!==null){
+    const query=localQuery.replace(/[\\%_]/g,'');
+    const rows=await db`select id,title,tags from family_recipes.recipes where deleted_at is null and (title ilike ${'%'+query+'%'} or exists (select 1 from unnest(tags) t where t ilike ${'%'+query+'%'}) or exists (select 1 from family_recipes.recipe_ingredients ri where ri.recipe_id=recipes.id and ri.name ilike ${'%'+query+'%'})) order by title,id limit 10`;
+    if(!rows.length)return 'По запросу «'+query+'» рецептов пока нет.';
+    const hits:SearchHit[]=(rows as unknown as SearchHit[]).map(r=>({id:r.id,title:r.title,tags:r.tags??[]}));
+    await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results)
+      values (${userId},${db.json(hits)})
+      on conflict (telegram_user_id) do update set last_search_results=excluded.last_search_results,updated_at=now()`;
+    return 'Нашёл по запросу «'+query+'»:\n'+hits.map((r,i)=>(i+1)+'. '+r.title).join('\n')+'\n\nНапиши номер, чтобы открыть рецепт.';
+  }
   const contextual=await openFromContext(userId,text);
   if(contextual!==null)return contextual;
   if(!geminiKey) return 'AI пока не настроен. Попробуй позже.';
