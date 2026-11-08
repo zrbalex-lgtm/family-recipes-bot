@@ -95,8 +95,8 @@ async function handlePhoto(userId:number,fileId:string,caption:string):Promise<s
 }
 async function exportRecipes():Promise<string>{
   if(!db)throw new Error('Database missing');
-  const rows=await db`select id,title,description,instructions,tags,created_at,updated_at from family_recipes.recipes where deleted_at is null order by title limit 2000`;
-  if(rows.length===2000)throw new Error('Export limit reached: 2000 recipes');
+  const rows=await db`select id,title,description,instructions,tags,created_at,updated_at from family_recipes.recipes where deleted_at is null order by title limit 2001`;
+  if(rows.length>2000)throw new Error('Export limit reached: 2000 recipes');
   const ids=rows.map(r=>r.id);
   const ingredients=ids.length?await db`select recipe_id,name,quantity,unit,note,sort_order from family_recipes.recipe_ingredients where recipe_id in ${db(ids)} order by recipe_id,sort_order`:[];
   const byId=new Map<string,unknown[]>();
