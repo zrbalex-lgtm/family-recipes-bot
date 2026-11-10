@@ -55,3 +55,11 @@ Deno.test("explicit ingredient and tag searches bypass previous results",()=>{
   assertEquals(localRecipeSearch("Найди рецепты с сыром"),"сыр");
   assertEquals(localRecipeSearch("Покажи рецепт Пани"),null);
 });
+
+Deno.test("natural-language recipe discovery",()=>{
+  assertEquals(localRecipeSearch("Покажи быстрые рецепты"),"быстро");
+  assertEquals(localRecipeSearch("Что приготовить на завтрак"),"завтрак");
+  assertEquals(localRecipeSearch("Что-нибудь с сыром"),"сыр");
+  assertEquals(localRecipeSearch("Покажи вегетарианские рецепты"),"вегетарианское");
+  assertEquals(localRecipeSearch("Покажи рецепт Пани"),null);
+});
