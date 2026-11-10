@@ -63,3 +63,9 @@ Deno.test("natural-language recipe discovery",()=>{
   assertEquals(localRecipeSearch("Покажи вегетарианские рецепты"),"вегетарианское");
   assertEquals(localRecipeSearch("Покажи рецепт Пани"),null);
 });
+
+Deno.test("reported short and inflected ingredient queries",()=>{
+  assertEquals(localRecipeSearch("Рецепты с сыром"),"сыр");
+  assertEquals(localRecipeSearch("Покажи рецепты с хлебом"),"хлеб");
+  assertEquals(localRecipeSearch("Рецепты с хлебом"),"хлеб");
+});
