@@ -90,7 +90,13 @@ async function handlePhoto(userId:number,fileId:string,caption:string):Promise<s
     await sql`update family_recipes.recipe_drafts set status='cancelled' where telegram_user_id=${userId} and status='pending'`;
     await sql`insert into family_recipes.recipe_drafts (telegram_user_id,draft_type,payload) values (${userId},'create',${sql.json(recipe)})`;
   });
-  return 'Проверь рецепт, распознанный по фотографии:\n\n'+formatRecipe(recipe)+'\n\nОтветь «сохранить» или «отмена». Черновик действует 24 часа.';
+  return 'Проверь рецепт, распознанный по фотографии:\n\n'+formatRecipe(recipe)+(await duplicateRecipeNotice(recipe.title))+'\n\nОтветь «сохранить» или «отмена». Черновик действует 24 часа.';
+}
+async function duplicateRecipeNotice(title:string):Promise<string>{
+  if(!db)return '';
+  const matches=await db`select id,title from family_recipes.recipes where deleted_at is null and lower(title)=${title.trim().toLocaleLowerCase('ru')} order by created_at desc limit 3`;
+  if(!matches.length)return '';
+  return '\n\n⚠️ В книге уже есть '+matches.length+(matches.length===3?'+':'')+' рецепт(а) с названием «'+title+'». Сохранение создаст отдельный рецепт, существующие не изменятся. Для изменения существующего сначала найди и открой его.';
 }
 async function exportRecipes():Promise<string>{
   if(!db)throw new Error('Database missing');
@@ -247,7 +253,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
     console.error('Recipe stage failed',{stage:'database_draft_save',category:code?'postgres':'other',dbCode:code});
     throw error;
   }
-  return 'Проверь рецепт перед сохранением:\n\n'+formatRecipe(recipe)+'\n\nОтветь «сохранить» или «отмена». Черновик действует 24 часа.';
+  return 'Проверь рецепт перед сохранением:\n\n'+formatRecipe(recipe)+(await duplicateRecipeNotice(recipe.title))+'\n\nОтветь «сохранить» или «отмена». Черновик действует 24 часа.';
 }
 
 Deno.serve(async request=>{
