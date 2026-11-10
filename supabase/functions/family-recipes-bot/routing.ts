@@ -47,11 +47,21 @@ export function listPage(text:string):number{
 }
 
 export function localRecipeSearch(text:string):string|null{
-  const command=text.trim().toLocaleLowerCase('ru');
-  const match=/^(?:покажи(?: мне)?|найди|подбери)\s+рецепты?\s+(?:с|со|на|по)\s+(.+)$/iu.exec(command);
-  if(!match)return null;
-  const raw=match[1].trim();
-  if(raw==='сыром'||raw==='сыра')return 'сыр';
-  if(raw==='завтрак'||raw==='завтраки')return 'завтрак';
-  return raw;
+  const command=text.trim().toLocaleLowerCase('ru').replace(/\s+/gu,' ');
+  const patterns=[
+    /^(?:покажи(?: мне)?|найди|подбери)\s+рецепты?\s+(?:с|со|на|по)\s+(.+)$/iu,
+    /^(?:покажи(?: мне)?|найди|подбери)\s+(быстрые|простые|сладкие|вегетарианские)\s+рецепты$/iu,
+    /^что(?:-нибудь)?\s+приготовить\s+на\s+(.+)$/iu,
+    /^что(?:-нибудь)?\s+с\s+(.+)$/iu,
+    /^что\s+приготовить\s+с\s+(.+)$/iu,
+    /^(?:покажи(?: мне)?|найди|подбери)\s+рецепты?\s+(?:для|из)\s+(.+)$/iu,
+  ];
+  const raw=patterns.map(pattern=>pattern.exec(command)?.[1]?.trim()).find(Boolean);
+  if(!raw)return null;
+  const aliases:Record<string,string>={
+    'сыром':'сыр','сыра':'сыр','завтраки':'завтрак',
+    'быстрые':'быстро','простые':'простое','сладкие':'десерт',
+    'вегетарианские':'вегетарианское'
+  };
+  return aliases[raw]??raw;
 }
