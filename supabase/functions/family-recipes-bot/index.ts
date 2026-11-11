@@ -187,7 +187,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   }
   if(text.length>8000) return 'Рецепт слишком длинный. Отправь текст до 8000 символов.';
   // Explicit numbered selections are deterministic; all other free text goes to AI routing.
-  if(/^(?:[1-9]|10|первый|второй|третий)$/iu.test(text.trim())){
+  if(/^(?:[1-9]|первый|второй|третий)$/iu.test(text.trim())){
     const selected=await openFromContext(userId,text);
     if(selected!==null)return selected;
   }
@@ -198,7 +198,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   if(intent.intent==='list')return handle(userId,'/list');
   if(intent.intent==='open'){
     const requested=intent.query.trim();
-    const command=/^(?:[1-9]|10|первый|второй|третий)$/iu.test(requested)?requested:'покажи рецепт '+requested;
+    const command=/^(?:[1-9]|первый|второй|третий)$/iu.test(requested)?requested:'покажи рецепт '+requested;
     if(!requested)return 'Какой рецепт открыть? Напиши название или номер из последнего списка.';
     return await openFromContext(userId,command)??'Рецепт не найден.';
   }
