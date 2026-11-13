@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { classifyLocalCommand, listPage, localRecipeSearch, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from "./routing.ts";
+import { classifyLocalCommand, listPage, localRecipeSearch, normalizeRecipeSearchQuery, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from "./routing.ts";
 
 Deno.test("list all recipes is a list, not contextual show", () => {
   for (const input of ["Покажи все рецепты", "покажи всё рецепты", "Выведи все рецепты", "список рецептов", "/list"]) {
@@ -68,4 +68,12 @@ Deno.test("reported short and inflected ingredient queries",()=>{
   assertEquals(localRecipeSearch("Рецепты с сыром"),"сыр");
   assertEquals(localRecipeSearch("Покажи рецепты с хлебом"),"хлеб");
   assertEquals(localRecipeSearch("Рецепты с хлебом"),"хлеб");
+});
+
+Deno.test("vegetarian category and other inflected search words",()=>{
+  assertEquals(normalizeRecipeSearchQuery("вегетарианские"),"вегетарианск");
+  assertEquals(normalizeRecipeSearchQuery("вегетарианское"),"вегетарианск");
+  assertEquals(normalizeRecipeSearchQuery("быстрые"),"быстр");
+  assertEquals(normalizeRecipeSearchQuery("сыром"),"сыр");
+  assertEquals(normalizeRecipeSearchQuery("завтрак"),"завтрак");
 });
