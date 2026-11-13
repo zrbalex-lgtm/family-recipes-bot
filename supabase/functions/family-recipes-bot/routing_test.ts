@@ -77,3 +77,9 @@ Deno.test("vegetarian category and other inflected search words",()=>{
   assertEquals(normalizeRecipeSearchQuery("сыром"),"сыр");
   assertEquals(normalizeRecipeSearchQuery("завтрак"),"завтрак");
 });
+
+Deno.test("duplicate existing-recipe callback parses safely",()=>{
+  const id="123e4567-e89b-42d3-a456-426614174000";
+  assertEquals(parseDraftCallback("draft:existing:"+id),{action:"existing",draftId:id});
+  assertEquals(parseDraftCallback("draft:existing:not-a-uuid"),null);
+});
