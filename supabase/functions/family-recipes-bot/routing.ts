@@ -3,10 +3,10 @@ export function classifyLocalCommand(text:string):'list'|'other'{
   return /^(?:(?:покажи(?: мне)?|выведи)\s+(?:(?:все|всё)\s+рецепты|рецепты\s+(?:все|всё))|(?:список|перечень)\s+рецептов|какие\s+рецепты\s+(?:есть|у нас есть))(?:\s+страница\s+[1-9]\d{0,3})?$/iu.test(command)||/^\/list(?:\s+[1-9]\d{0,3})?$/iu.test(command)?'list':'other';
 }
 
-export type DraftAction='save'|'confirm'|'delete'|'cancel';
+export type DraftAction='save'|'confirm'|'delete'|'cancel'|'existing';
 export function parseDraftCallback(data:unknown):{action:DraftAction;draftId:string}|null{
   if(typeof data!=='string')return null;
-  const match=/^draft:(save|confirm|delete|cancel):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(data);
+  const match=/^draft:(save|confirm|delete|cancel|existing):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(data);
   return match?{action:match[1] as DraftAction,draftId:match[2].toLowerCase()}:null;
 }
 
