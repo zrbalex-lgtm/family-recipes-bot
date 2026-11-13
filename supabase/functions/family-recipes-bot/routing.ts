@@ -65,3 +65,16 @@ export function localRecipeSearch(text:string):string|null{
   };
   return aliases[raw]??raw;
 }
+
+export function normalizeRecipeSearchQuery(input:string):string{
+  const query=input.toLocaleLowerCase('ru').trim().replace(/\\s+/gu,' ');
+  const categories:Record<string,string>={
+    'вегетарианские':'вегетарианск','вегетарианский':'вегетарианск',
+    'вегетарианское':'вегетарианск','вегетарианская':'вегетарианск',
+    'быстрые':'быстр','быстрый':'быстр','быстро':'быстр',
+    'завтраки':'завтрак','завтрак':'завтрак',
+    'сладкие':'сладк','сладкое':'сладк',
+    'хлебом':'хлеб','сыром':'сыр'
+  };
+  return categories[query]??query;
+}
