@@ -1,4 +1,4 @@
-import { classifyLocalCommand, listPage, localRecipeSearch, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from './routing.ts';
+import { classifyLocalCommand, listPage, localRecipeSearch, normalizeRecipeSearchQuery, parseDraftCallback, explicitRecipeTitle, suggestRecipeTitles } from './routing.ts';
 import { createDatabase } from '../_shared/database.ts';
 import { validWebhookSecret } from '../_shared/auth.ts';
 import { parseUpdate, sendMessage, answerCallback, clearButtons, getTelegramPhoto, sendJsonExport, TelegramRejected } from '../_shared/telegram.ts';
@@ -203,7 +203,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
     return await openFromContext(userId,command)??'Рецепт не найден.';
   }
   if(intent.intent==='search') {
-    const query=intent.query.toLowerCase().replace(/[\%_]/g,'').trim();
+    const query=normalizeRecipeSearchQuery(intent.query.replace(/[\%_]/g,''));
     const rows=query
       ?await db`select id,title,tags from family_recipes.recipes where deleted_at is null and (title ilike ${'%'+query+'%'} or exists (select 1 from unnest(tags) t where t ilike ${'%'+query+'%'}) or exists (select 1 from family_recipes.recipe_ingredients ri where ri.recipe_id=recipes.id and ri.name ilike ${'%'+query+'%'})) order by created_at desc limit 10`
       :await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by created_at desc limit 10`;
