@@ -141,6 +141,17 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
     await db`update family_recipes.recipe_drafts set status='cancelled' where telegram_user_id=${userId} and status='pending' and (${buttonDraftId??null}::uuid is null or id=${buttonDraftId??null}::uuid)`;
     return 'Черновик отменён.';
   }
+  if(command==='/existing'){
+    const drafts=await db`select id,payload from family_recipes.recipe_drafts where telegram_user_id=${userId} and draft_type='create' and status='pending' and expires_at>now() and id=${buttonDraftId??null}::uuid limit 1`;
+    if(!drafts.length)return 'Черновик уже обработан или истёк.';
+    const title=String((drafts[0].payload as Recipe).title);
+    const matches=await db`select id,title from family_recipes.recipes where deleted_at is null and lower(title)=${title.trim().toLocaleLowerCase('ru')} order by created_at desc limit 10`;
+    await db`update family_recipes.recipe_drafts set status='cancelled' where id=${drafts[0].id} and status='pending'`;
+    if(!matches.length)return 'Совпадающих рецептов больше нет. Добавь рецепт заново.';
+    const hits:SearchHit[]=matches.map(r=>({id:String(r.id),title:String(r.title),tags:[]}));
+    await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results) values (${userId},${db.json(hits)}) on conflict (telegram_user_id) do update set last_search_results=excluded.last_search_results,updated_at=now()`;
+    return 'Новый черновик отменён. Существующие рецепты «'+title+'»:\n'+hits.map((r,i)=>(i+1)+'. '+r.title).join('\n')+'\n\nНапиши номер, чтобы открыть нужный, затем отдельной командой укажи, что изменить.';
+  }
   if(command==='сохранить'||command==='/save') {
     const drafts=await db`select id,payload from family_recipes.recipe_drafts where telegram_user_id=${userId} and draft_type='create' and status='pending' and expires_at>now() and (${buttonDraftId??null}::uuid is null or id=${buttonDraftId??null}::uuid) order by created_at desc limit 1`;
     if(!drafts.length) return 'Нет ожидающего подтверждения рецепта. Пришли рецепт текстом.';
@@ -266,7 +277,7 @@ Deno.serve(async request=>{
   const cb=update.callback_query;
   const match=parseDraftCallback(cb?.data);
   const callbackValid=!!(cb&&match&&cb.message?.chat.type==='private'&&cb.from.id===cb.message.chat.id);
-  const m=callbackValid?{chat:cb!.message!.chat,from:cb!.from,text:match!.action==='save'?'сохранить':match!.action==='confirm'?'подтвердить':match!.action==='delete'?'удалить':'отмена'}:update.message;
+  const m=callbackValid?{chat:cb!.message!.chat,from:cb!.from,text:match!.action==='save'?'сохранить':match!.action==='confirm'?'подтвердить':match!.action==='delete'?'удалить':match!.action==='existing'?'/existing':'отмена'}:update.message;
   if(!m||m.chat.type!=='private'||!m.from||m.chat.id!==m.from.id||(typeof m.text!=='string'&&!Array.isArray(m.photo)))return ok();
   try{
     const users=await db`select 1 from family_recipes.bot_users where telegram_user_id=${m.from.id} and is_active=true limit 1`;
@@ -292,11 +303,17 @@ Deno.serve(async request=>{
     try{
       let buttons:{text:string;callback_data:string}[]|undefined;
       if(!callbackValid&&(/Черновик действует 24 часа/.test(reply)||/Напиши «подтвердить» или «отмена»/.test(reply)||/Напиши «удалить» для подтверждения/.test(reply))){
-        const drafts=await db`select id,draft_type from family_recipes.recipe_drafts where telegram_user_id=${m.from.id} and status='pending' and expires_at>now() order by created_at desc limit 1`;
+        const drafts=await db`select id,draft_type,payload from family_recipes.recipe_drafts where telegram_user_id=${m.from.id} and status='pending' and expires_at>now() order by created_at desc limit 1`;
         if(drafts.length){
           const d=drafts[0];
           const action=d.draft_type==='create'?'save':d.draft_type==='edit'?'confirm':'delete';
-          buttons=[{text:action==='save'?'💾 Сохранить':action==='confirm'?'✅ Подтвердить':'🗑 Удалить',callback_data:'draft:'+action+':'+d.id},{text:'Отмена',callback_data:'draft:cancel:'+d.id}];
+          buttons=[{text:action==='save'?'💾 Сохранить новый':action==='confirm'?'✅ Подтвердить':'🗑 Удалить',callback_data:'draft:'+action+':'+d.id}];
+          if(d.draft_type==='create'){
+            const title=String((d.payload as Recipe).title??'');
+            const duplicate=title?await db`select 1 from family_recipes.recipes where deleted_at is null and lower(title)=${title.trim().toLocaleLowerCase('ru')} limit 1`:[];
+            if(duplicate.length)buttons.push({text:'✏️ Изменить существующий',callback_data:'draft:existing:'+d.id});
+          }
+          buttons.push({text:'Отмена',callback_data:'draft:cancel:'+d.id});
         }
       }
       if(callbackValid){
