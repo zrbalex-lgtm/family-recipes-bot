@@ -210,8 +210,8 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   if(intent.intent==='search') {
     const query=normalizeRecipeSearchQuery(intent.query.replace(/[\%_]/g,''));
     const rows=query
-      ?await db`select id,title,tags from family_recipes.recipes where deleted_at is null and (title ilike ${'%'+query+'%'} or exists (select 1 from unnest(tags) t where t ilike ${'%'+query+'%'}) or exists (select 1 from family_recipes.recipe_ingredients ri where ri.recipe_id=recipes.id and ri.name ilike ${'%'+query+'%'})) order by created_at desc limit 10`
-      :await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by created_at desc limit 10`;
+      ?await db`select id,title,tags from family_recipes.recipes where deleted_at is null and (title ilike ${'%'+query+'%'} or exists (select 1 from unnest(tags) t where t ilike ${'%'+query+'%'}) or exists (select 1 from family_recipes.recipe_ingredients ri where ri.recipe_id=recipes.id and ri.name ilike ${'%'+query+'%'})) order by title,id limit 2000`
+      :await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by title,id limit 2000`;
     if(!rows.length)return 'Пока не нашёл подходящих рецептов. Попробуй другое название или попроси показать все рецепты.';
     const hits:SearchHit[]=(rows as unknown as SearchHit[]).map(r=>({id:r.id,title:r.title,tags:r.tags??[]}));
     await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results)
