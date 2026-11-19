@@ -29,7 +29,7 @@ async function showRecipe(userId:number,id:string):Promise<string> {
 async function openFromContext(userId:number,text:string):Promise<string|null> {
   if(!db)throw new Error('Database missing');
   const command=text.trim().toLowerCase();
-  const isView=/^(?:покажи(?: мне)?(?: рецепт)?|подробнее|открой(?: рецепт)?|посмотреть(?: рецепт)?|рецепт|[1-9]|первый|второй|третий)(?:\s.*)?$/iu.test(command);
+  const isView=/^(?:покажи(?: мне)?(?: рецепт)?|подробнее|открой(?: рецепт)?|посмотреть(?: рецепт)?|рецепт|[1-9]\\d{0,3}|первый|второй|третий)(?:\s.*)?$/iu.test(command);
   if(classifyLocalCommand(command)==='list')return null;
   const requestedTitle=explicitRecipeTitle(text);
   if(requestedTitle){
@@ -49,7 +49,7 @@ async function openFromContext(userId:number,text:string):Promise<string|null> {
   const sessions=await db`select last_search_results from family_recipes.bot_sessions where telegram_user_id=${userId} limit 1`;
   const hits:SearchHit[]=Array.isArray(sessions[0]?.last_search_results)?sessions[0].last_search_results.filter((v:unknown)=>v&&typeof v==='object'&&typeof (v as SearchHit).id==='string'):[];
   if(!hits.length)return 'Сначала найди рецепт, например «Найди сырники».';
-  const match=command.match(/(?:^|\s)([1-9])(?:$|\s)/);
+  const match=command.match(/(?:^|\\s)([1-9]\\d{0,3})(?:$|\\s)/);
   const number=match?Number(match[1]):command.includes('второй')?2:command.includes('третий')?3:command.includes('первый')?1:null;
   if(number!==null)return hits[number-1]?await showRecipe(userId,hits[number-1].id):'В последнем поиске нет рецепта с таким номером.';
   const named=hits.filter(h=>command.includes(h.title.toLowerCase()));
