@@ -109,6 +109,20 @@ async function exportRecipes():Promise<string>{
   return JSON.stringify({exported_at:new Date().toISOString(),recipes:rows.map(r=>({title:r.title,description:r.description,instructions:r.instructions,tags:r.tags,ingredients:byId.get(r.id)??[],created_at:r.created_at,updated_at:r.updated_at}))},null,2);
 }
 
+async function searchRecipeList(userId:number,rawQuery:string):Promise<string>{
+  if(!db)throw new Error('Database missing');
+    const query=normalizeRecipeSearchQuery(rawQuery.replace(/[\%_]/g,''));
+    const rows=query
+      ?await db`select id,title,tags from family_recipes.recipes where deleted_at is null and (title ilike ${'%'+query+'%'} or exists (select 1 from unnest(tags) t where t ilike ${'%'+query+'%'}) or exists (select 1 from family_recipes.recipe_ingredients ri where ri.recipe_id=recipes.id and ri.name ilike ${'%'+query+'%'})) order by title,id limit 2000`
+      :await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by title,id limit 2000`;
+    if(!rows.length)return 'Пока не нашёл подходящих рецептов. Попробуй другое название или попроси показать все рецепты.';
+    const hits:SearchHit[]=(rows as unknown as SearchHit[]).map(r=>({id:r.id,title:r.title,tags:r.tags??[]}));
+    await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results)
+      values (${userId},${db.json(hits)})
+      on conflict (telegram_user_id) do update set last_search_results=excluded.last_search_results,updated_at=now()`;
+    return 'Нашёл в семейной книге:\n'+hits.map((r,i)=>(i+1)+'. '+r.title+(r.tags.length?' ('+r.tags.join(', ')+')':'')).join('\n')+'\n\nНапиши «Покажи рецепт» или номер.';
+}
+
 async function handle(userId:number,text:string,buttonDraftId?:string):Promise<string> {
   if(!db) throw new Error('Database missing');
   const command=text.trim().toLowerCase();
@@ -196,6 +210,13 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
     const selected=await openFromContext(userId,text);
     if(selected!==null)return selected;
   }
+  // Common category requests must work even when the AI service is unavailable.
+  const categoryRequest=text.trim().toLocaleLowerCase('ru').match(/^(?:покажи|найди|список|дай)(?:\\s+мне)?(?:\\s+все)?\\s+(?:(?:рецепты|блюда)\\s+)?(?:на\\s+)?(салаты|салат|завтрак|завтраки|десерты|десерт|супы|суп|выпечка|выпечку|торты|торт|печенье|рыба|рыбу|мясо|быстрые)(?:\\s+рецепты)?$/iu);
+  if(categoryRequest){
+    const terms:Record<string,string>={салаты:'салат',салат:'салат',завтрак:'завтрак',завтраки:'завтрак',десерты:'десерт',десерт:'десерт',супы:'суп',суп:'суп',выпечка:'выпечка',выпечку:'выпечка',торты:'торт',торт:'торт',печенье:'печенье',рыба:'рыба',рыбу:'рыба',мясо:'мясо',быстрые:'быстр'};
+    return searchRecipeList(userId,terms[categoryRequest[1]]);
+  }
+  if(/^(?:покажи|найди)\\s+все\\s+рецепты\\s+на\\s+завтрак$/iu.test(text.trim()))return searchRecipeList(userId,'завтрак');
   if(!geminiKey) return 'AI пока не настроен. Попробуй позже.';
   let intent:{intent:'add'|'search'|'list'|'open'|'edit'|'delete'|'question';query:string};
   try {intent=await classifyMessage(text,geminiKey);}
@@ -207,18 +228,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
     if(!requested)return 'Какой рецепт открыть? Напиши название или номер из последнего списка.';
     return await openFromContext(userId,command)??'Рецепт не найден.';
   }
-  if(intent.intent==='search') {
-    const query=normalizeRecipeSearchQuery(intent.query.replace(/[\%_]/g,''));
-    const rows=query
-      ?await db`select id,title,tags from family_recipes.recipes where deleted_at is null and (title ilike ${'%'+query+'%'} or exists (select 1 from unnest(tags) t where t ilike ${'%'+query+'%'}) or exists (select 1 from family_recipes.recipe_ingredients ri where ri.recipe_id=recipes.id and ri.name ilike ${'%'+query+'%'})) order by title,id limit 2000`
-      :await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by title,id limit 2000`;
-    if(!rows.length)return 'Пока не нашёл подходящих рецептов. Попробуй другое название или попроси показать все рецепты.';
-    const hits:SearchHit[]=(rows as unknown as SearchHit[]).map(r=>({id:r.id,title:r.title,tags:r.tags??[]}));
-    await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results)
-      values (${userId},${db.json(hits)})
-      on conflict (telegram_user_id) do update set last_search_results=excluded.last_search_results,updated_at=now()`;
-    return 'Нашёл в семейной книге:\n'+hits.map((r,i)=>(i+1)+'. '+r.title+(r.tags.length?' ('+r.tags.join(', ')+')':'')).join('\n')+'\n\nНапиши «Покажи рецепт» или номер.';
-  }
+  if(intent.intent==='search')return searchRecipeList(userId,intent.query);
 
   if(intent.intent==='edit'||intent.intent==='delete'){
     const target=await targetRecipe(userId,intent.query);
