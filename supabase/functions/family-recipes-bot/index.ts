@@ -29,7 +29,7 @@ async function showRecipe(userId:number,id:string):Promise<string> {
 async function openFromContext(userId:number,text:string):Promise<string|null> {
   if(!db)throw new Error('Database missing');
   const command=text.trim().toLowerCase();
-  const isView=/^(?:покажи(?: мне)?(?: рецепт)?|подробнее|открой(?: рецепт)?|посмотреть(?: рецепт)?|рецепт|[1-9]\\d{0,3}|первый|второй|третий)(?:\s.*)?$/iu.test(command);
+  const isView=/^(?:покажи(?: мне)?(?: рецепт)?|подробнее|открой(?: рецепт)?|посмотреть(?: рецепт)?|рецепт|[1-9]\d{0,3}|первый|второй|третий)(?:\s.*)?$/iu.test(command);
   if(classifyLocalCommand(command)==='list')return null;
   const requestedTitle=explicitRecipeTitle(text);
   if(requestedTitle){
@@ -49,7 +49,7 @@ async function openFromContext(userId:number,text:string):Promise<string|null> {
   const sessions=await db`select last_search_results from family_recipes.bot_sessions where telegram_user_id=${userId} limit 1`;
   const hits:SearchHit[]=Array.isArray(sessions[0]?.last_search_results)?sessions[0].last_search_results.filter((v:unknown)=>v&&typeof v==='object'&&typeof (v as SearchHit).id==='string'):[];
   if(!hits.length)return 'Сначала найди рецепт, например «Найди сырники».';
-  const match=command.match(/(?:^|\\s)([1-9]\\d{0,3})(?:$|\\s)/);
+  const match=command.match(/(?:^|\s)([1-9]\d{0,3})(?:$|\s)/);
   const number=match?Number(match[1]):command.includes('второй')?2:command.includes('третий')?3:command.includes('первый')?1:null;
   if(number!==null)return hits[number-1]?await showRecipe(userId,hits[number-1].id):'В последнем поиске нет рецепта с таким номером.';
   const named=hits.filter(h=>command.includes(h.title.toLowerCase()));
@@ -113,7 +113,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   if(!db) throw new Error('Database missing');
   const command=text.trim().toLowerCase();
   if(command==='/export'||command==='экспорт рецептов')return 'Готовлю JSON-файл с семейными рецептами.';
-  if(/^(?:\\/categories|\\/tags|категории|какие категории есть|покажи категории|покажи теги|какие теги есть|теги)$/iu.test(command)){
+  if(/^(?:\/categories|\/tags|категории|какие категории есть|покажи категории|покажи теги|какие теги есть|теги)$/iu.test(command)){
     const tags=await db`select tag,count(*)::int as n from family_recipes.recipes cross join lateral unnest(tags) tag where deleted_at is null group by tag order by n desc,tag`;
     const categories=await db`select category,count(*)::int as n from family_recipes.recipes where deleted_at is null and category is not null group by category order by n desc,category`;
     if(/теги|tags/.test(command))return tags.length?'Теги в семейной книге:\n'+tags.map(r=>'• '+r.tag+' ('+r.n+')').join('\n'):'Теги пока не назначены.';
@@ -192,7 +192,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   }
   if(text.length>8000) return 'Рецепт слишком длинный. Отправь текст до 8000 символов.';
   // Explicit numbered selections are deterministic; all other free text goes to AI routing.
-  if(/^(?:[1-9]\\d{0,3}|первый|второй|третий)$/iu.test(text.trim())){
+  if(/^(?:[1-9]\d{0,3}|первый|второй|третий)$/iu.test(text.trim())){
     const selected=await openFromContext(userId,text);
     if(selected!==null)return selected;
   }
@@ -203,7 +203,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   if(intent.intent==='list')return handle(userId,'/list');
   if(intent.intent==='open'){
     const requested=intent.query.trim();
-    const command=/^(?:[1-9]\\d{0,3}|первый|второй|третий)$/iu.test(requested)?requested:'покажи рецепт '+requested;
+    const command=/^(?:[1-9]\d{0,3}|первый|второй|третий)$/iu.test(requested)?requested:'покажи рецепт '+requested;
     if(!requested)return 'Какой рецепт открыть? Напиши название или номер из последнего списка.';
     return await openFromContext(userId,command)??'Рецепт не найден.';
   }
@@ -288,7 +288,7 @@ Deno.serve(async request=>{
     try{reply=Array.isArray(m.photo)&&m.photo.length?await handlePhoto(m.from.id,m.photo[m.photo.length-1].file_id,m.caption??''):await handle(m.from.id,m.text??'',callbackValid?match!.draftId:undefined);}
     catch(error){
       const message=error instanceof Error?error.message:'';
-      const geminiStatus=/^Gemini HTTP (\\d{3})$/.exec(message);
+      const geminiStatus=/^Gemini HTTP (\d{3})$/.exec(message);
       const category=geminiStatus?'gemini_http':message==='Empty Gemini response'?'gemini_empty':message==='Invalid recipe JSON'?'gemini_invalid_json':message==='Not a complete recipe'?'recipe_incomplete':error instanceof SyntaxError?'json_parse':error instanceof TypeError?'network_or_type':error instanceof Error&&error.name==='PostgresError'?'database':'other';
       const dbCode=category==='database'&&error&&typeof error==='object'&&'code' in error&&typeof error.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:null;
       console.error('Recipe handling failed',{category,geminiHttpStatus:geminiStatus?Number(geminiStatus[1]):null,dbCode});
