@@ -113,26 +113,20 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   if(!db) throw new Error('Database missing');
   const command=text.trim().toLowerCase();
   if(command==='/export'||command==='экспорт рецептов')return 'Готовлю JSON-файл с семейными рецептами.';
+  if(/^(?:\\/categories|\\/tags|категории|какие категории есть|покажи категории|покажи теги|какие теги есть|теги)$/iu.test(command)){
+    const tags=await db`select tag,count(*)::int as n from family_recipes.recipes cross join lateral unnest(tags) tag where deleted_at is null group by tag order by n desc,tag`;
+    const categories=await db`select category,count(*)::int as n from family_recipes.recipes where deleted_at is null and category is not null group by category order by n desc,category`;
+    if(/теги|tags/.test(command))return tags.length?'Теги в семейной книге:\n'+tags.map(r=>'• '+r.tag+' ('+r.n+')').join('\n'):'Теги пока не назначены.';
+    return categories.length?'Категории:\n'+categories.map(r=>'• '+r.category+' ('+r.n+')').join('\n')+'\n\nДля просмотра тегов напиши «Покажи теги».':'Категории пока не назначены.';
+  }
   if(classifyLocalCommand(command)==='list'){
-    const page=listPage(command);
-    const offset=(page-1)*10;
-    const rows=await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by title,id limit 11 offset ${offset}`;
-    if(!rows.length)return page===1?'В семейной книге пока нет рецептов.':'На странице '+page+' рецептов нет. Напиши «Список рецептов». ';
-    const hits:SearchHit[]=(rows.slice(0,10) as unknown as SearchHit[]).map(r=>({id:r.id,title:r.title,tags:r.tags??[]}));
+    const rows=await db`select id,title,tags from family_recipes.recipes where deleted_at is null order by title,id limit 2000`;
+    if(!rows.length)return 'В семейной книге пока нет рецептов.';
+    const hits:SearchHit[]=(rows as unknown as SearchHit[]).map(r=>({id:r.id,title:r.title,tags:r.tags??[]}));
     await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results)
       values (${userId},${db.json(hits)})
       on conflict (telegram_user_id) do update set last_search_results=excluded.last_search_results,updated_at=now()`;
-    const titleCounts=new Map<string,number>();
-    for(const hit of hits){const key=hit.title.toLocaleLowerCase('ru');titleCounts.set(key,(titleCounts.get(key)??0)+1);}
-    const duplicateIds=hits.filter(h=>(titleCounts.get(h.title.toLocaleLowerCase('ru'))??0)>1).map(h=>h.id);
-    const details=duplicateIds.length?await db`select recipe_id,name from family_recipes.recipe_ingredients where recipe_id in ${db(duplicateIds)} order by sort_order`:[];
-    const ingredientNames=new Map<string,string[]>();
-    for(const item of details){const id=String(item.recipe_id);const names=ingredientNames.get(id)??[];if(names.length<3)names.push(String(item.name));ingredientNames.set(id,names);}
-    return 'Рецепты в семейной книге (страница '+page+'):\n'+hits.map((r,i)=>{
-      const duplicate=(titleCounts.get(r.title.toLocaleLowerCase('ru'))??0)>1;
-      const preview=duplicate?(ingredientNames.get(r.id)??[]).join(', '):'';
-      return (i+1)+'. '+r.title+(duplicate&&preview?' ('+preview+')':'');
-    }).join('\n')+(rows.length>10?'\nСледующая страница: «Список рецептов страница '+(page+1)+'».':'')+(page>1?'\nПервая страница: «Список рецептов».':'')+'\n\nНапиши номер от 1 до 10, чтобы открыть рецепт на этой странице.';
+    return 'Все рецепты ('+hits.length+'):\n'+hits.map((r,i)=>(i+1)+'. '+r.title).join('\n')+'\n\nНапиши номер рецепта, чтобы открыть.';
   }
 
   if(command==='/start') return 'Добро пожаловать в семейную книгу рецептов! Пришли рецепт текстом, я оформлю его и предложу сохранить. /help - справка.';
@@ -198,7 +192,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   }
   if(text.length>8000) return 'Рецепт слишком длинный. Отправь текст до 8000 символов.';
   // Explicit numbered selections are deterministic; all other free text goes to AI routing.
-  if(/^(?:[1-9]|первый|второй|третий)$/iu.test(text.trim())){
+  if(/^(?:[1-9]\\d{0,3}|первый|второй|третий)$/iu.test(text.trim())){
     const selected=await openFromContext(userId,text);
     if(selected!==null)return selected;
   }
@@ -209,7 +203,7 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
   if(intent.intent==='list')return handle(userId,'/list');
   if(intent.intent==='open'){
     const requested=intent.query.trim();
-    const command=/^(?:[1-9]|первый|второй|третий)$/iu.test(requested)?requested:'покажи рецепт '+requested;
+    const command=/^(?:[1-9]\\d{0,3}|первый|второй|третий)$/iu.test(requested)?requested:'покажи рецепт '+requested;
     if(!requested)return 'Какой рецепт открыть? Напиши название или номер из последнего списка.';
     return await openFromContext(userId,command)??'Рецепт не найден.';
   }
