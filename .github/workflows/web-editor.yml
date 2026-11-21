@@ -1,0 +1,28 @@
+name: Web recipe editor
+on:
+  push:
+    branches: [feature/web-recipe-editor]
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-editor.yml'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://opufwbpkuofxhfmlqhqq.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_9GUcLyV1elRRfrxb29n2sg_vYtdTr3L
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-editor-build
+          path: web/dist
