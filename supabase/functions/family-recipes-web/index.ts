@@ -21,8 +21,12 @@ Deno.serve(async req=>{
   if(!auth.ok)return respond({error:'Unauthorized'},401);
   const user=await auth.json();
   if(!uuid.test(user.id??''))return respond({error:'Unauthorized'},401);
+  // Allow a pre-approved email only after Supabase Auth has verified ownership.
   const members=await db`select 1 from family_recipes.web_members where user_id=${user.id}::uuid limit 1`;
-  if(!members.length)return respond({error:'Доступ к семейной книге ещё не предоставлен'},403);
+  const invited=typeof user.email==='string'&&user.email_confirmed_at
+    ?await db`select 1 from family_recipes.web_allowed_emails where email=${user.email.toLowerCase()} limit 1`
+    :[];
+  if(!members.length&&!invited.length)return respond({error:'Доступ к семейной книге ещё не предоставлен'},403);
   const path=new URL(req.url).pathname.replace(/^.*\/family-recipes-web/,'');
   if(path==='/recipes'&&req.method==='GET'){
    const recipes=await db`select id,title,description,category,tags,instructions,version from family_recipes.recipes where deleted_at is null order by title,id limit 2000`;
