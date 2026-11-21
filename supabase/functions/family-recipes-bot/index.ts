@@ -17,6 +17,7 @@ async function showRecipe(userId:number,id:string):Promise<string> {
   const rows=await db`select id,title,description,instructions,tags from family_recipes.recipes where id=${id} and deleted_at is null limit 1`;
   if(!rows.length)return 'Этот рецепт больше не найден. Попробуй новый поиск.';
   const r=rows[0];
+  await db`insert into family_recipes.bot_sessions (telegram_user_id,current_recipe_id) values (${userId},${id}::uuid) on conflict (telegram_user_id) do update set current_recipe_id=excluded.current_recipe_id,updated_at=now()`;
   const ingredients=await db`select name,quantity,unit,note from family_recipes.recipe_ingredients where recipe_id=${id} order by sort_order`;
   // Keep the search result list intact so users can open another numbered result.
   // Viewing a recipe must not replace the last search with a single-item list.
@@ -69,6 +70,12 @@ async function targetRecipe(userId:number,query:string) {
     if(exact)return exact.id;
     const rows=await db`select id,title from family_recipes.recipes where deleted_at is null and title ilike ${'%'+q.replace(/[%_]/g,'')+'%'} order by created_at desc limit 2`;
     if(rows.length===1)return rows[0].id as string;
+  }
+  const current=await db`select current_recipe_id from family_recipes.bot_sessions where telegram_user_id=${userId} limit 1`;
+  const currentId=current[0]?.current_recipe_id;
+  if(currentId){
+    const exists=await db`select id from family_recipes.recipes where id=${currentId} and deleted_at is null limit 1`;
+    if(exists.length)return String(exists[0].id);
   }
   return hits.length===1?hits[0].id:null;
 }
