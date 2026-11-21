@@ -36,7 +36,7 @@ Deno.serve(async req=>{
   if(!body||body.id!==id||typeof body.title!=='string'||!body.title.trim()||body.title.length>250||!Number.isInteger(body.version)||!Array.isArray(body.ingredients)||body.ingredients.length>150||!Array.isArray(body.instructions)||body.instructions.length>150||!Array.isArray(body.tags)||body.tags.length>50)return respond({error:'Некорректные данные'},400);
   if(body.ingredients.some((i:unknown)=>!i||typeof i!=='object'||typeof (i as {name?:unknown}).name!=='string'||(i as {name:string}).name.length>300)||body.instructions.some((x:unknown)=>typeof x!=='string')||body.tags.some((x:unknown)=>typeof x!=='string'))return respond({error:'Некорректные поля'},400);
   const updated=await db.begin(async sql=>{
-   const rows=await sql`update family_recipes.recipes set title=${body.title.trim()},description=${typeof body.description==='string'?body.description:null},category=${typeof body.category==='string'?body.category:null},tags=${body.tags},instructions=${sql.json(body.instructions)},version=version+1 where id=${id} and deleted_at is null and version=${body.version} returning id`;
+   const rows=await sql`update family_recipes.recipes set title=${body.title.trim()},description=${typeof body.description==='string'?body.description:null},category=${typeof body.category==='string'?body.category:null},tags=${body.tags as string[]},instructions=${sql.json(body.instructions)},version=version+1 where id=${id} and deleted_at is null and version=${body.version} returning id`;
    if(!rows.length)return false;
    await sql`delete from family_recipes.recipe_ingredients where recipe_id=${id}`;
    for(let i=0;i<body.ingredients.length;i++){
