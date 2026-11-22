@@ -10,10 +10,10 @@ type Recipe={id:string;title:string;description:string|null;category:string|null
 const parseQuantity=(raw:string):{quantity:string|null;quantity_max:string|null;quantity_text:string|null}=>{
  const text=raw.trim().replace(/[−–—]/g,'-');
  if(!text)return {quantity:null,quantity_max:null,quantity_text:null};
- const n='(?:\\d+(?:[.,]\\d+)?|\\d+\\s*/\\s*\\d+)';
- const match=text.match(new RegExp('^('+n+')(?:\\s*-\\s*('+n+'))?$'));
- const value=(v:string)=>v.includes('/')?String(Number(v.split('/')[0])/Number(v.split('/')[1])):v.replace(',','.');
- if(match){const low=Number(value(match[1])),high=match[2]?Number(value(match[2])):null;if(!Number.isFinite(low)||low<0||high!==null&&(!Number.isFinite(high)||high<low))throw Error('Неверный диапазон количества: '+raw);return {quantity:String(low),quantity_max:high===null?null:String(high),quantity_text:null}}
+ const number='(?:\\d+(?:[.,]\\d+)?|\\d+\\s*/\\s*\\d+|\\d+\\s*(?:и\\s+|\\s+)\\d+\\s*/\\s*\\d+)';
+ const match=text.match(new RegExp('^('+number+')(?:\\s*-\\s*('+number+'))?$','i'));
+ const value=(v:string)=>{const m=v.trim().match(/^(?:(\d+)\s*(?:и\s+|\s+))?(\d+)\s*\/\s*(\d+)$/i);if(m){const denominator=Number(m[3]);if(!denominator)throw Error('Нулевой знаменатель: '+raw);return Number(m[1]??0)+Number(m[2])/denominator}return Number(v.replace(',','.'))};
+ if(match){const low=value(match[1]),high=match[2]?value(match[2]):null;if(!Number.isFinite(low)||low<0||high!==null&&(!Number.isFinite(high)||high<low))throw Error('Неверный диапазон количества: '+raw);return {quantity:String(low),quantity_max:high===null?null:String(high),quantity_text:null}}
  return {quantity:null,quantity_max:null,quantity_text:raw.trim()};
 };
 const quantityInput=(i:Ingredient)=>i.quantity_text??(i.quantity===null?'':i.quantity_max===null||i.quantity_max===undefined?i.quantity:i.quantity+'–'+i.quantity_max);
