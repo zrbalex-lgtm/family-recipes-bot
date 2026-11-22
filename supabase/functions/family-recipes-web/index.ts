@@ -2,11 +2,11 @@ import {createDatabase} from '../_shared/database.ts';
 const db=createDatabase(Deno.env.get('FAMILY_RECIPES_DATABASE_URL')??'');
 const supabaseUrl=Deno.env.get('SUPABASE_URL')??'';
 const publicKey=Deno.env.get('SUPABASE_ANON_KEY')??'';
-const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type','Access-Control-Allow-Methods':'GET, PUT, OPTIONS'};
+const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type','Access-Control-Allow-Methods':'GET, PUT, DELETE, OPTIONS'};
 const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{...cors,'Content-Type':'application/json'}});
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 async function getRecipe(id:string){
- const rows=await db`select id,title,description,category,tags,instructions,version from family_recipes.recipes where id=${id} and deleted_at is null limit 1`;
+ const rows=await db`select id,title,description,category,tags,instructions,source_text,version from family_recipes.recipes where id=${id} and deleted_at is null limit 1`;
  if(!rows.length)return null;
  const ingredients=await db`select name,quantity,unit,note from family_recipes.recipe_ingredients where recipe_id=${id} order by sort_order`;
  return {...rows[0],ingredients:ingredients.map(i=>({name:String(i.name),quantity:i.quantity===null?null:String(i.quantity),unit:i.unit,note:i.note}))};
@@ -14,7 +14,7 @@ async function getRecipe(id:string){
 Deno.serve(async req=>{
  if(req.method==='OPTIONS')return new Response(null,{headers:cors});
  try{
-  if(!['GET','PUT'].includes(req.method))return respond({error:'Method not allowed'},405);
+  if(!['GET','PUT','DELETE'].includes(req.method))return respond({error:'Method not allowed'},405);
   const token=req.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1];
   if(!token||!supabaseUrl||!publicKey)return respond({error:'Unauthorized'},401);
   const auth=await fetch(supabaseUrl+'/auth/v1/user',{headers:{Authorization:'Bearer '+token,apikey:publicKey}});
@@ -36,6 +36,12 @@ Deno.serve(async req=>{
   if(!match||!uuid.test(match[1]))return respond({error:'Not found'},404);
   const id=match[1];
   if(req.method==='GET'){const recipe=await getRecipe(id);return recipe?respond({recipe}):respond({error:'Рецепт не найден'},404)}
+  if(req.method==='DELETE') {
+   const body=await req.json();
+   if(!Number.isInteger(body?.version))return respond({error:'Некорректная версия'},400);
+   const removed=await db`update family_recipes.recipes set deleted_at=now(),version=version+1 where id=${id} and deleted_at is null and version=${body.version} returning id`;
+   return removed.length?respond({ok:true}):respond({error:'Рецепт уже изменён или удалён'},409);
+  }
   const body=await req.json();
   if(!body||body.id!==id||typeof body.title!=='string'||!body.title.trim()||body.title.length>250||!Number.isInteger(body.version)||!Array.isArray(body.ingredients)||body.ingredients.length>150||!Array.isArray(body.instructions)||body.instructions.length>150||!Array.isArray(body.tags)||body.tags.length>50)return respond({error:'Некорректные данные'},400);
   if(body.ingredients.some((i:unknown)=>!i||typeof i!=='object'||typeof (i as {name?:unknown}).name!=='string'||(i as {name:string}).name.length>300)||body.instructions.some((x:unknown)=>typeof x!=='string')||body.tags.some((x:unknown)=>typeof x!=='string'))return respond({error:'Некорректные поля'},400);
