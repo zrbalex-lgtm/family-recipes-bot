@@ -8,8 +8,8 @@ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 async function getRecipe(id:string){
  const rows=await db`select id,title,description,category,tags,instructions,source_text,version from family_recipes.recipes where id=${id} and deleted_at is null limit 1`;
  if(!rows.length)return null;
- const ingredients=await db`select name,quantity,unit,note from family_recipes.recipe_ingredients where recipe_id=${id} order by sort_order`;
- return {...rows[0],ingredients:ingredients.map(i=>({name:String(i.name),quantity:i.quantity===null?null:String(i.quantity),unit:i.unit,note:i.note}))};
+ const ingredients=await db`select name,quantity,quantity_max,quantity_text,unit,note from family_recipes.recipe_ingredients where recipe_id=${id} order by sort_order`;
+ return {...rows[0],ingredients:ingredients.map(i=>({name:String(i.name),quantity:i.quantity===null?null:String(i.quantity),quantity_max:i.quantity_max===null?null:String(i.quantity_max),quantity_text:i.quantity_text,unit:i.unit,note:i.note}))};
 }
 Deno.serve(async req=>{
  if(req.method==='OPTIONS')return new Response(null,{headers:cors});
@@ -51,9 +51,14 @@ Deno.serve(async req=>{
    await sql`delete from family_recipes.recipe_ingredients where recipe_id=${id}`;
    for(let i=0;i<body.ingredients.length;i++){
     const x=body.ingredients[i];if(!x.name.trim())continue;
-    const quantity=x.quantity===null||x.quantity===''?null:Number(String(x.quantity).replace(',','.'));
-    if(quantity!==null&&(!Number.isFinite(quantity)||quantity<0))throw new RangeError('Некорректное количество для «'+x.name+'». Укажи число или оставь поле пустым.');
-    await sql`insert into family_recipes.recipe_ingredients (recipe_id,name,normalized_name,quantity,unit,note,sort_order) values (${id},${x.name.trim()},${x.name.trim().toLocaleLowerCase('ru')},${quantity},${typeof x.unit==='string'?x.unit:null},${typeof x.note==='string'?x.note:null},${i})`;
+    const parse=(v:unknown)=>v===null||v===undefined||v===''?null:Number(String(v).trim().replace(',','.'));
+    const quantity=parse(x.quantity),maximum=parse(x.quantity_max);
+    const label=String(x.name).trim();
+    if(quantity!==null&&(!Number.isFinite(quantity)||quantity<0))throw new RangeError('Некорректное количество для «'+label+'»');
+    if(maximum!==null&&(!Number.isFinite(maximum)||quantity===null||maximum<quantity))throw new RangeError('Некорректный диапазон для «'+label+'»');
+    const qualitative=typeof x.quantity_text==='string'?x.quantity_text.trim():null;
+    if(qualitative&&qualitative.length>120)throw new RangeError('Слишком длинное описание количества для «'+label+'»');
+    await sql`insert into family_recipes.recipe_ingredients (recipe_id,name,normalized_name,quantity,quantity_max,quantity_text,unit,note,sort_order) values (${id},${label},${label.toLocaleLowerCase('ru')},${quantity},${maximum},${qualitative||null},${typeof x.unit==='string'?x.unit:null},${typeof x.note==='string'?x.note:null},${i})`;
    }
    return true;
   });
