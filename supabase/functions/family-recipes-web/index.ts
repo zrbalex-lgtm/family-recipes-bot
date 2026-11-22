@@ -47,7 +47,7 @@ Deno.serve(async req=>{
     const x=body.ingredients[i];if(!x.name.trim())continue;
     const quantity=x.quantity===null||x.quantity===''?null:Number(String(x.quantity).replace(',','.'));
     if(quantity!==null&&(!Number.isFinite(quantity)||quantity<0))throw Error('Некорректное количество: '+x.name);
-    await sql`insert into family_recipes.recipe_ingredients (recipe_id,name,quantity,unit,note,sort_order) values (${id},${x.name},${quantity},${typeof x.unit==='string'?x.unit:null},${typeof x.note==='string'?x.note:null},${i})`;
+    await sql`insert into family_recipes.recipe_ingredients (recipe_id,name,normalized_name,quantity,unit,note,sort_order) values (${id},${x.name.trim()},${x.name.trim().toLocaleLowerCase('ru')},${quantity},${typeof x.unit==='string'?x.unit:null},${typeof x.note==='string'?x.note:null},${i})`;
    }
    return true;
   });
