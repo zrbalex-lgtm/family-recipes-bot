@@ -17,7 +17,7 @@ function App(){
  useEffect(()=>{client?.auth.getSession().then(({data})=>setSession(data.session));const sub=client?.auth.onAuthStateChange((_event,s)=>setSession(s));return()=>sub?.data.subscription.unsubscribe()},[]);
  useEffect(()=>{if(session)refresh(session);else{setItems([]);setSelected(null)}},[session?.access_token]);
  async function refresh(s:Session){try{setItems((await api<{recipes:Recipe[]}>(s,'/recipes')).recipes)}catch(e){setMessage(String(e))}}
- async function login(e:React.FormEvent){e.preventDefault();if(!client)return;setBusy(true);try{const{error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.href}});if(error)throw error;setMessage('Проверь почту: отправлена ссылка для входа.')}catch(e){setMessage(String(e))}finally{setBusy(false)}}
+ async function login(e:React.FormEvent){e.preventDefault();if(!client)return;setBusy(true);try{const{error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:'https://zrbalex-lgtm.github.io/family-recipes-bot/'}});if(error)throw error;setMessage('Проверь почту: отправлена ссылка для входа.')}catch(e){setMessage(String(e))}finally{setBusy(false)}}
  async function open(id:string){if(!session)return;try{setSelected((await api<{recipe:Recipe}>(session,'/recipes/'+encodeURIComponent(id))).recipe);setMessage('')}catch(e){setMessage(String(e))}}
  async function save(){if(!session||!selected)return;setBusy(true);try{const{recipe}=await api<{recipe:Recipe}>(session,'/recipes/'+selected.id,'PUT',selected);setSelected(recipe);await refresh(session);setMessage('Изменения сохранены')}catch(e){setMessage(String(e))}finally{setBusy(false)}}
  const edit=(patch:Partial<Recipe>)=>setSelected(v=>v?{...v,...patch}:v);
