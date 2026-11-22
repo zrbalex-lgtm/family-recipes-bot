@@ -52,12 +52,12 @@ Deno.serve(async req=>{
    for(let i=0;i<body.ingredients.length;i++){
     const x=body.ingredients[i];if(!x.name.trim())continue;
     const quantity=x.quantity===null||x.quantity===''?null:Number(String(x.quantity).replace(',','.'));
-    if(quantity!==null&&(!Number.isFinite(quantity)||quantity<0))throw Error('Некорректное количество: '+x.name);
+    if(quantity!==null&&(!Number.isFinite(quantity)||quantity<0))throw new RangeError('Некорректное количество для «'+x.name+'». Укажи число или оставь поле пустым.');
     await sql`insert into family_recipes.recipe_ingredients (recipe_id,name,normalized_name,quantity,unit,note,sort_order) values (${id},${x.name.trim()},${x.name.trim().toLocaleLowerCase('ru')},${quantity},${typeof x.unit==='string'?x.unit:null},${typeof x.note==='string'?x.note:null},${i})`;
    }
    return true;
   });
   if(!updated)return respond({error:'Рецепт изменился после открытия. Обнови страницу перед сохранением.'},409);
   return respond({recipe:await getRecipe(id)});
- }catch(e){console.error('Recipe web API error',e);return respond({error:'Не удалось обработать запрос'},500)}
+ }catch(e){if(e instanceof RangeError)return respond({error:e.message},400);console.error('Recipe web API error',e);return respond({error:'Не удалось обработать запрос'},500)}
 });
