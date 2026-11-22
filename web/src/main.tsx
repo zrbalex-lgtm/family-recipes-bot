@@ -24,7 +24,7 @@ function extractIngredients(source:string):ProposedIngredient[]{
  const lines=source.split(/\r?\n/);const output:ProposedIngredient[]=[];
  const unitPattern='кг|килограмм(?:а|ов)?|гр?\\.?|грамм(?:а|ов)?|мл|л|литр(?:а|ов)?|стакан(?:а|ов)?|ст\\.?\\s*л\\.?|ч\\.?\\s*л\\.?|чайных?\\s+лож(?:ка|ки|ек)|столовых?\\s+лож(?:ка|ки|ек)|шт\\.?|штук(?:и)?|пакетик(?:а|ов)?|банк(?:а|и|ок)';
  const amount='\\d+(?:[.,]\\d+)?(?:\\s*(?:и\\s+|\\s+)\\d+\\s*/\\s*\\d+|\\s*/\\s*\\d+)?(?:\\s*[-–—]\\s*\\d+(?:[.,]\\d+)?)?';
- const reAmount=new RegExp('('+amount+')\\s*('+unitPattern+')\\b','i');
+ const reAmount=new RegExp('('+amount+')\\s*('+unitPattern+')(?=\\s|$|[,;.)])','i');
  const reBefore=new RegExp('^\\s*('+amount+')\\s*('+unitPattern+')\\s+(.+)(session:Session,path:string,method='GET',body?:unknown):Promise<T>{
   if(!url||!key)throw Error('Не настроено подключение к Supabase');
   const res=await fetch(url+'/functions/v1/family-recipes-web'+path,{method,headers:{Authorization:'Bearer '+session.access_token,apikey:key,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
