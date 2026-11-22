@@ -5,13 +5,20 @@ import './style.css';
 const url=import.meta.env.VITE_SUPABASE_URL as string|undefined;
 const key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string|undefined;
 const client=url&&key?createClient(url,key):null;
-type Ingredient={name:string;quantity:string|null;unit:string|null;note:string|null};
+type Ingredient={name:string;quantity:string|null;quantity_max?:string|null;quantity_text?:string|null;unit:string|null;note:string|null};
 type Recipe={id:string;title:string;description:string|null;category:string|null;tags:string[];instructions:string[];source_text?:string|null;ingredients:Ingredient[];version:number};
 const parseQuantity=(raw:string):{quantity:string|null;quantity_max:string|null;quantity_text:string|null}=>{
  const text=raw.trim().replace(/[−–—]/g,'-');
  if(!text)return {quantity:null,quantity_max:null,quantity_text:null};
  const n='(?:\\d+(?:[.,]\\d+)?|\\d+\\s*/\\s*\\d+)';
- const match=text.match(new RegExp('^('+n+')(?:\\s*-\\s*('+n+'))?(session:Session,path:string,method='GET',body?:unknown):Promise<T>{
+ const match=text.match(new RegExp('^('+n+')(?:\\s*-\\s*('+n+'))?$'));
+ const value=(v:string)=>v.includes('/')?String(Number(v.split('/')[0])/Number(v.split('/')[1])):v.replace(',','.');
+ if(match){const low=Number(value(match[1])),high=match[2]?Number(value(match[2])):null;if(!Number.isFinite(low)||low<0||high!==null&&(!Number.isFinite(high)||high<low))throw Error('Неверный диапазон количества: '+raw);return {quantity:String(low),quantity_max:high===null?null:String(high),quantity_text:null}}
+ return {quantity:null,quantity_max:null,quantity_text:raw.trim()};
+};
+const quantityInput=(i:Ingredient)=>i.quantity_text??(i.quantity===null?'':i.quantity_max===null||i.quantity_max===undefined?i.quantity:i.quantity+'–'+i.quantity_max);
+const formatScaled=(i:Ingredient,factor:number)=>{const parsed=parseQuantity(quantityInput(i));if(parsed.quantity_text)return parsed.quantity_text;if(parsed.quantity===null)return '—';const fmt=(n:number)=>Number(n.toFixed(3)).toLocaleString('ru-RU');return fmt(Number(parsed.quantity)*factor)+(parsed.quantity_max? '–'+fmt(Number(parsed.quantity_max)*factor):'')};
+async function api<T>(session:Session,path:string,method='GET',body?:unknown):Promise<T>{
   if(!url||!key)throw Error('Не настроено подключение к Supabase');
   const res=await fetch(url+'/functions/v1/family-recipes-web'+path,{method,headers:{Authorization:'Bearer '+session.access_token,apikey:key,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
   const data=await res.json();if(!res.ok)throw Error(data.error??'Ошибка сервера');return data as T;
@@ -39,7 +46,7 @@ function App(){
  <label>Теги<input value={selected.tags.join(', ')} onChange={e=>edit({tags:e.target.value.split(',').map(x=>x.trim()).filter(Boolean)})}/></label>
  <h2>Ингредиенты</h2><div className="scale"><span>Масштаб рецепта</span>{[0.5,1,2,3].map(f=><button key={f} type="button" className={factor===f?'':'secondary'} onClick={()=>setFactor(f)}>×{String(f).replace('.',',')}</button>)}</div><p className="hint">Масштаб меняет только предварительный расчёт, оригинальные количества сохраняются.</p><div className="scaled-list">{selected.ingredients.filter(i=>i.name.trim()).map((i,k)=><div key={k}><span>{i.name}</span><strong>{formatScaled(i,factor)} {i.unit??''}</strong></div>)}</div>
  <p className="hint">Каждый ингредиент отдельной строкой. Сверяй с оригиналом ниже: импорт мог объединить несколько ингредиентов.</p>
- {selected.ingredients.map((ing,i)=><div className="ingredient" key={i}><input aria-label="Ингредиент" placeholder="Название" value={ing.name} onChange={e=>ingredient(i,{name:e.target.value})}/><input aria-label="Количество" placeholder="2–2,5" value={quantityInput(ing)} onChange={e=>ingredient(i,{...parseQuantity(e.target.value)})}/><input aria-label="Единица" placeholder="Ед." value={ing.unit??''} onChange={e=>ingredient(i,{unit:e.target.value||null})}/><input aria-label="Примечание" placeholder="Примечание" value={ing.note??''} onChange={e=>ingredient(i,{note:e.target.value||null})}/><button className="secondary" aria-label="Удалить ингредиент" onClick={()=>edit({ingredients:selected.ingredients.filter((_,j)=>i!==j)})}>×</button></div>)}
+ {selected.ingredients.map((ing,i)=><div className="ingredient" key={i}><input aria-label="Ингредиент" placeholder="Название" value={ing.name} onChange={e=>ingredient(i,{name:e.target.value})}/><input aria-label="Количество" placeholder="2–2,5" value={quantityInput(ing)} onChange={e=>ingredient(i,{quantity:null,quantity_max:null,quantity_text:e.target.value})}/><input aria-label="Единица" placeholder="Ед." value={ing.unit??''} onChange={e=>ingredient(i,{unit:e.target.value||null})}/><input aria-label="Примечание" placeholder="Примечание" value={ing.note??''} onChange={e=>ingredient(i,{note:e.target.value||null})}/><button className="secondary" aria-label="Удалить ингредиент" onClick={()=>edit({ingredients:selected.ingredients.filter((_,j)=>i!==j)})}>×</button></div>)}
  <button className="secondary" onClick={()=>edit({ingredients:[...selected.ingredients,{name:'',quantity:null,quantity_max:null,quantity_text:null,unit:null,note:null}]})}>+ Ингредиент</button>
  <h2>Приготовление</h2><textarea rows={12} value={selected.instructions.join('\n')} onChange={e=>edit({instructions:e.target.value.split('\n')})}/>
  {selected.source_text&&<details className="original"><summary>Исходный текст рецепта (только чтение)</summary><pre>{selected.source_text}</pre></details>}
