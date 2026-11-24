@@ -59,9 +59,9 @@ export async function reviseRecipe(recipe:Recipe,request:string,key:string):Prom
   return {title:value.title.trim().slice(0,200),description:typeof value.description==='string'?value.description.slice(0,1000):null,ingredients,instructions:value.instructions.filter((v:unknown)=>typeof v==='string').slice(0,60),tags:Array.isArray(value.tags)?value.tags.filter((v:unknown)=>typeof v==='string').slice(0,5):[]};
 }
 
-export async function extractPhotoRecipe(bytes:Uint8Array,mime:string,caption:string,key:string):Promise<Recipe>{
+async function extractPhotoRecipeOnce(bytes:Uint8Array,mime:string,caption:string,key:string):Promise<Recipe>{
   let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
-  const prompt='Прочитай рецепт на фотографии или распознай описанное блюдо. Не выдумывай ингредиенты и количества. Если шаги не указаны, но очевидны, можно описать их кратко. Верни строго JSON: {"title":"...","description":null,"ingredients":[{"name":"...","quantity":null,"unit":null,"note":null}],"instructions":["..."],"tags":["..."]}. Все на русском, 2-5 тегов. Если фото не содержит достаточно сведений о рецепте, верни пустые title, ingredients и instructions. Подпись: '+caption.slice(0,1500);
+  const prompt='Прочитай весь текст рецепта на фотографии, включая скриншоты социальных сетей. Игнорируй интерфейс приложения. Используй название из подписи, если оно указано. Не выдумывай ингредиенты и количества. Если шаги не указаны, но очевидны, можно описать их кратко. Верни строго JSON: {"title":"...","description":null,"ingredients":[{"name":"...","quantity":null,"unit":null,"note":null}],"instructions":["..."],"tags":["..."]}. Все на русском, 2-5 тегов. Если фото не содержит достаточно сведений о рецепте, верни пустые title, ingredients и instructions. Подпись: '+caption.slice(0,1500);
   const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:mime,data:btoa(binary)}}]}],generationConfig:{responseMimeType:'application/json',temperature:0.1}}),signal:AbortSignal.timeout(25000)});
   if(!response.ok)throw new Error('Gemini HTTP '+response.status);
   const data=await response.json();
@@ -70,4 +70,16 @@ export async function extractPhotoRecipe(bytes:Uint8Array,mime:string,caption:st
   if(!value||typeof value.title!=='string'||!value.title.trim()||!Array.isArray(value.ingredients)||!value.ingredients.length||!Array.isArray(value.instructions)||!value.instructions.length)throw new Error('Incomplete photo recipe');
   const ingredients=value.ingredients.slice(0,80).map((v:Record<string,unknown>)=>({name:typeof v.name==='string'?v.name.trim().slice(0,200):'',quantity:typeof v.quantity==='number'&&Number.isFinite(v.quantity)&&v.quantity>=0?v.quantity:null,unit:typeof v.unit==='string'?v.unit.slice(0,40):null,note:typeof v.note==='string'?v.note.slice(0,500):null})).filter((v:{name:string})=>v.name);
   return {title:value.title.trim().slice(0,200),description:typeof value.description==='string'?value.description.slice(0,1000):null,ingredients,instructions:value.instructions.filter((v:unknown)=>typeof v==='string').slice(0,60),tags:Array.isArray(value.tags)?value.tags.filter((v:unknown)=>typeof v==='string').slice(0,5):[]};
+}
+
+export async function extractPhotoRecipe(bytes:Uint8Array,mime:string,caption:string,key:string):Promise<Recipe>{
+ for(let attempt=0;;attempt++){
+  try{return await extractPhotoRecipeOnce(bytes,mime,caption,key)}catch(error){
+   const message=error instanceof Error?error.message:'';
+   const retryable=/^Gemini HTTP (408|429|5\\d\\d)$/.test(message)||error instanceof SyntaxError||error instanceof TypeError||(error instanceof Error&&['TimeoutError','AbortError'].includes(error.name))||message==='Incomplete photo recipe';
+   if(attempt>=1||!retryable)throw error;
+   console.warn('Photo extraction retry',{reason:message==='Incomplete photo recipe'?'incomplete':'transient_or_invalid_response'});
+   await new Promise(resolve=>setTimeout(resolve,1000));
+  }
+ }
 }
