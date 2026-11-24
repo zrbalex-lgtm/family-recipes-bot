@@ -35,12 +35,14 @@ async function openFromContext(userId:number,text:string):Promise<string|null> {
   const requestedTitle=explicitRecipeTitle(text);
   if(requestedTitle){
     const escaped=requestedTitle.replace(/[\\%_]/g,'');
-    const exact=await db`select id from family_recipes.recipes where deleted_at is null and lower(title)=${requestedTitle.toLowerCase()} order by created_at desc limit 2`;
-    if(exact.length===1)return showRecipe(userId,exact[0].id as string);
-    if(exact.length>1)return 'Найдено несколько рецептов с таким названием. Уточни название.';
-    const matches=await db`select id,title from family_recipes.recipes where deleted_at is null and title ilike ${'%'+escaped+'%'} order by created_at desc limit 2`;
-    if(matches.length===1)return showRecipe(userId,matches[0].id as string);
-    if(matches.length>1)return 'Найдено несколько похожих рецептов. Уточни название.';
+    const exact=await db`select id,title from family_recipes.recipes where deleted_at is null and lower(title)=${requestedTitle.toLowerCase()} order by title,id`;
+    const matches=exact.length?exact:await db`select id,title from family_recipes.recipes where deleted_at is null and (title ilike ${'%'+escaped+'%'} or to_tsvector('russian',replace(lower(title),'ё','е')) @@ plainto_tsquery('russian',replace(lower(${requestedTitle}),'ё','е'))) order by title,id`;
+    if(matches.length===1)return showRecipe(userId,String(matches[0].id));
+    if(matches.length>1){
+      const hits=matches.map(r=>({id:String(r.id),title:String(r.title)}));
+      await db`insert into family_recipes.bot_sessions (telegram_user_id,last_search_results) values (${userId},${db.json(hits)}) on conflict (telegram_user_id) do update set last_search_results=excluded.last_search_results,updated_at=now()`;
+      return 'Какой рецепт показать? Напиши номер:\n'+hits.map((h,i)=>(i+1)+'. '+h.title).join('\n');
+    }
     const candidates=await db`select title from family_recipes.recipes where deleted_at is null order by title limit 500`;
     const suggestions=suggestRecipeTitles(requestedTitle,candidates.map(r=>String(r.title)));
     if(suggestions.length)return 'Рецепт «'+requestedTitle+'» не найден. Возможно, ты имел в виду: '+suggestions.map(t=>'«'+t+'»').join(', ')+'. Напиши точное название для открытия.';
