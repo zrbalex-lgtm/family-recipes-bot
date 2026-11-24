@@ -309,7 +309,7 @@ Deno.serve(async request=>{
       const category=geminiStatus?'gemini_http':message==='Empty Gemini response'?'gemini_empty':message==='Invalid recipe JSON'?'gemini_invalid_json':message==='Not a complete recipe'?'recipe_incomplete':error instanceof SyntaxError?'json_parse':error instanceof TypeError?'network_or_type':error instanceof Error&&error.name==='PostgresError'?'database':'other';
       const dbCode=category==='database'&&error&&typeof error==='object'&&'code' in error&&typeof error.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?error.code:null;
       console.error('Recipe handling failed',{category,geminiHttpStatus:geminiStatus?Number(geminiStatus[1]):null,dbCode});
-      reply='Не удалось обработать рецепт. Проверь, что указаны название, ингредиенты и способ приготовления, и попробуй снова.';
+      reply=message==='Incomplete photo recipe'?'Не удалось полностью распознать рецепт на фото. Попробуй отправить более крупный снимок или текст рецепта.':message==='Not a complete recipe'?'Не удалось выделить полный рецепт из текста. Проверь ингредиенты и приготовление.':geminiStatus?'Сервис распознавания временно недоступен (код '+geminiStatus[1]+'). Попробуй позже.':category==='database'?'Ошибка базы данных. Проверь список рецептов перед повторной отправкой.':category==='json_parse'||category==='gemini_empty'||category==='gemini_invalid_json'?'Сервис распознавания вернул некорректный ответ. Попробуй ещё раз.':'Техническая ошибка при обработке запроса. Попробуй позже.';
     }
     try{
       let buttons:{text:string;callback_data:string}[]|undefined;
