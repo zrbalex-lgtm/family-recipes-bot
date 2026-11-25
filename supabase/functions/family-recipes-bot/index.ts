@@ -226,6 +226,10 @@ async function handle(userId:number,text:string,buttonDraftId?:string):Promise<s
     return searchRecipeList(userId,terms[categoryRequest[1]]);
   }
   if(/^(?:покажи|найди)\\s+все\\s+рецепты\\s+на\\s+завтрак$/iu.test(text.trim()))return searchRecipeList(userId,'завтрак');
+  if(explicitRecipeTitle(text)&&classifyLocalCommand(text.trim().toLowerCase())!=='list'){
+    const opened=await openFromContext(userId,text);
+    if(opened!==null)return opened;
+  }
   if(!geminiKey) return 'AI пока не настроен. Попробуй позже.';
   let intent:{intent:'add'|'search'|'list'|'open'|'edit'|'delete'|'question';query:string};
   try {intent=await classifyMessage(text,geminiKey);}
