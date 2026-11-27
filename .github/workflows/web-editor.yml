@@ -1,0 +1,54 @@
+name: Web recipe editor
+on:
+  push:
+    branches: [feature/web-recipe-editor]
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-editor.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-editor.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://opufwbpkuofxhfmlqhqq.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_9GUcLyV1elRRfrxb29n2sg_vYtdTr3L
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-editor-build
+          path: web/dist
+  deploy:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-editor-build
+          path: dist
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
